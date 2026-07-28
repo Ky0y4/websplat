@@ -52,7 +52,7 @@ await new Promise(resolve => loader.load(resolve));
 
 const camera = new Entity('Camera');
 
-camera.setPosition(0.5, 0, 5);
+camera.setPosition(0.5, 30, 0);
 
 camera.addComponent('camera', {
     clearColor: [0, 0, 0, 0]
