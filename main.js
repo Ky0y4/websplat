@@ -21,7 +21,7 @@ const assets = [
         url: 'https://cdn.jsdelivr.net/npm/playcanvas/scripts/esm/camera-controls.mjs'
     }),
     new Asset('vrlab', 'gsplat', {
-        url: './output/lod-meta.json'
+        url: './streamed/lod-meta.json'
     })
 ];
 
