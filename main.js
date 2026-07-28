@@ -69,7 +69,7 @@ app.root.addChild(camera);
 
 const splatRoot = new Entity("SplatRoot");
 app.root.addChild(splatRoot);
-splatRoot.setPosition(-5, 0, 0);
+splatRoot.setPosition(-0.3, 0.7, 0);
 
 // ----------------------------------------------------
 // SPLAT
