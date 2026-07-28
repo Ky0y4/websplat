@@ -69,6 +69,7 @@ app.root.addChild(camera);
 
 const splatRoot = new Entity("SplatRoot");
 app.root.addChild(splatRoot);
+splatRoot.setLocalScale(0.1, 0.1, 0.1);
 
 // ----------------------------------------------------
 // SPLAT
