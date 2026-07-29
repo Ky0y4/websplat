@@ -30,6 +30,12 @@ app.setCanvasFillMode(FILLMODE_FILL_WINDOW);
 app.setCanvasResolution(RESOLUTION_AUTO);
 app.start();
 
+console.log("Scene GSplat:");
+console.dir(app.scene.gsplat);
+
+console.log("Scene GSplat Material:");
+console.dir(app.scene.gsplat.material);
+
 window.addEventListener('resize', () => app.resizeCanvas());
 
 // ----------------------------------------------------
@@ -90,21 +96,6 @@ splat.addComponent("gsplat", {
 splatRoot.addChild(splat);
 window.splat = splat;
 
-// ---------- DEBUG ----------
-console.log("GSplat component:");
-console.log(splat.gsplat);
-
-console.dir(splat.gsplat);
-
-console.log("Keys:");
-console.log(Object.keys(splat.gsplat));
-
-console.log("meshInstance:");
-console.log(splat.gsplat.meshInstance);
-
-console.log("meshInstances:");
-console.log(splat.gsplat.meshInstances);
-// ---------------------------
 
 // ----------------------------------------------------
 // XR BUTTON
