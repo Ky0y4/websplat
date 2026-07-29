@@ -7,7 +7,9 @@ import {
     RESOLUTION_AUTO,
     XRTYPE_AR,
     XRSPACE_LOCALFLOOR,
-    Vec3
+    Vec3,
+    XRDEPTHSENSINGUSAGE_GPU,
+    XRDEPTHSENSINGFORMAT_F32
 } from 'playcanvas';
 
 // ----------------------------------------------------
@@ -119,6 +121,10 @@ button.addEventListener('click', () => {
             XRTYPE_AR,
             XRSPACE_LOCALFLOOR,
             {
+                depthSensing: {
+                    usagePreference: XRDEPTHSENSINGUSAGE_GPU,
+                    dataFormatPreference: XRDEPTHSENSINGFORMAT_F32
+                },
                 callback: (err) => {
                     if (err) {
                         console.error(err);
@@ -132,6 +138,7 @@ button.addEventListener('click', () => {
     }
 
 });
+
 // ----------------------------------------------------
 // CONTROLLERS
 // ----------------------------------------------------
@@ -149,6 +156,19 @@ app.xr.input.on("add", (inputSource) => {
     if (inputSource.handedness === "right")
         rightController = inputSource;
 
+});
+
+// ----------------------------------------------------
+// DEPTH SENSING CHECK
+// ----------------------------------------------------
+
+console.log('Depth sensing supported:', app.xr.views.supportedDepth);
+
+app.xr.on('start', () => {
+    console.log('XR session started');
+    console.log('Depth available:', app.xr.views.availableDepth);
+    console.log('Depth GPU optimized:', app.xr.views.depthGpuOptimized);
+    console.log('Depth pixel format:', app.xr.views.depthPixelFormat);
 });
 
 // ----------------------------------------------------
