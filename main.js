@@ -177,6 +177,10 @@ const target = new Vec3();
 
 app.on("update", (dt) => {
 
+    if (leftController && leftController.gamepad) {
+    console.log('axes:', leftController.gamepad.axes);
+    }
+
     if (!leftController || !leftController.gamepad) {
         // decay velocity to zero if no controller
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
