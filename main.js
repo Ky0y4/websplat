@@ -115,24 +115,27 @@ button.addEventListener('click', () => {
 
         camera.script.enabled = false;
 
+        // Register debugDiv as the DOM overlay root BEFORE starting XR
+        if (app.xr.domOverlay.supported) {
+            app.xr.domOverlay.root = debugDiv;
+        } else {
+            console.warn('DOM Overlay not supported on this device/browser');
+        }
+
         camera.camera.startXr(
             XRTYPE_AR,
             XRSPACE_LOCALFLOOR,
             {
                 callback: (err) => {
-
                     if (err) {
                         console.error(err);
                     }
-
                 }
             }
         );
 
     } else {
-
         alert("AR not supported");
-
     }
 
 });
