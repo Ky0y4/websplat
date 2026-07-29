@@ -264,3 +264,27 @@ app.xr.on("end", () => {
     camera.script.enabled = true;
 
 });
+
+let debugPrinted = false;
+
+app.on("update", () => {
+
+    if (debugPrinted)
+        return;
+
+    if (!splat.gsplat.instance)
+        return;
+
+    debugPrinted = true;
+
+    console.log("===== GSPLAT READY =====");
+
+    console.log("Instance:");
+    console.dir(splat.gsplat.instance);
+
+    console.log("Material:");
+    console.dir(splat.gsplat.material);
+
+    console.log("Resource:");
+    console.dir(splat.gsplat.resource);
+});
