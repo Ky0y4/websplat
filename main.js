@@ -115,13 +115,6 @@ button.addEventListener('click', () => {
 
         camera.script.enabled = false;
 
-        // Register debugDiv as the DOM overlay root BEFORE starting XR
-        if (app.xr.domOverlay.supported) {
-            app.xr.domOverlay.root = debugDiv;
-        } else {
-            console.warn('DOM Overlay not supported on this device/browser');
-        }
-
         camera.camera.startXr(
             XRTYPE_AR,
             XRSPACE_LOCALFLOOR,
@@ -139,7 +132,6 @@ button.addEventListener('click', () => {
     }
 
 });
-
 // ----------------------------------------------------
 // CONTROLLERS
 // ----------------------------------------------------
@@ -170,28 +162,9 @@ let velocity = new Vec3();
 
 // scratch vectors (avoid allocating every frame)
 const forward = new Vec3();
-const right = new Vec3();
 const move = new Vec3();
 const target = new Vec3();
 
-// ----------------------------------------------------
-// DEBUG OVERLAY
-// ----------------------------------------------------
-
-const debugDiv = document.createElement('div');
-debugDiv.style.cssText = `
-    position:fixed;
-    top:10px;
-    left:10px;
-    z-index:20;
-    color:white;
-    background:rgba(0,0,0,0.6);
-    padding:10px;
-    font-family:monospace;
-    font-size:14px;
-    white-space:pre;
-`;
-document.body.appendChild(debugDiv);
 
 // ----------------------------------------------------
 // UPDATE
@@ -199,16 +172,7 @@ document.body.appendChild(debugDiv);
 
 app.on("update", (dt) => {
 
-    if (leftController && leftController.gamepad) {
-    debugDiv.textContent =
-        'axes: ' + JSON.stringify(leftController.gamepad.axes.map(a => a.toFixed(2))) + '\n' +
-        'buttons: ' + JSON.stringify(leftController.gamepad.buttons.map(b => b.pressed));
-    } else {
-        debugDiv.textContent = 'no left controller/gamepad';
-    }
-
     if (!leftController || !leftController.gamepad) {
-        // decay velocity to zero if no controller
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
         return;
     }
@@ -216,35 +180,30 @@ app.on("update", (dt) => {
     const axes = leftController.gamepad.axes;
     const buttons = leftController.gamepad.buttons;
 
-    let x = 0;
-    let y = 0;
+    let y = 0; // vertical, from joystick
 
-    if (axes) {
-        x = axes[0];
-        y = axes[1];
-        if (Math.abs(x) < 0.1) x = 0;
+    if (axes && axes.length >= 2) {
+        // thumbstick is always the LAST two axes per xr-standard spec
+        y = axes[axes.length - 1];
         if (Math.abs(y) < 0.1) y = 0;
     }
 
-    // Camera-relative directions, flattened to horizontal plane
+    // Camera-relative forward, flattened to horizontal plane
     forward.copy(camera.forward);
     forward.y = 0;
     forward.normalize();
 
-    right.copy(camera.right);
-    right.y = 0;
-    right.normalize();
-
     move.set(0, 0, 0);
-    move.add(right.clone().mulScalar(x));
-    move.add(forward.clone().mulScalar(-y)); // stick up (negative y) = forward
 
-    // Trigger = up, Grip = down (indices per xr-standard mapping)
+    // Trigger = forward, Grip = backward (per xr-standard: buttons[0]=trigger, buttons[1]=grip)
     const trigger = buttons && buttons[0] ? buttons[0].pressed : false;
     const grip = buttons && buttons[1] ? buttons[1].pressed : false;
 
-    if (trigger) move.y += 1;
-    if (grip) move.y -= 1;
+    if (trigger) move.add(forward);
+    if (grip) move.sub(forward);
+
+    // Joystick Y = vertical
+    move.y += -y; // stick up = up; flip sign if inverted
 
     if (move.length() > 1.0) {
         move.normalize();
@@ -253,7 +212,6 @@ app.on("update", (dt) => {
     target.copy(move).mulScalar(moveSpeed);
     velocity.lerp(velocity, target, smoothing * dt);
 
-    // Move the WORLD opposite to simulated camera movement
     const delta = velocity.clone().mulScalar(-dt);
     splatRoot.setPosition(
         splatRoot.getPosition().x + delta.x,
