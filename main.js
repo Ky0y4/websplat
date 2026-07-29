@@ -6,7 +6,8 @@ import {
     FILLMODE_FILL_WINDOW,
     RESOLUTION_AUTO,
     XRTYPE_AR,
-    XRSPACE_LOCALFLOOR
+    XRSPACE_LOCALFLOOR,
+    Vec3
 } from 'playcanvas';
 
 // ----------------------------------------------------
@@ -160,6 +161,15 @@ app.xr.input.on("add", (inputSource) => {
 // ----------------------------------------------------
 
 const moveSpeed = 1.0;
+const smoothing = 5.0; // higher = snappier, lower = floatier
+
+let velocity = new Vec3();
+
+// scratch vectors (avoid allocating every frame)
+const forward = new Vec3();
+const right = new Vec3();
+const move = new Vec3();
+const target = new Vec3();
 
 // ----------------------------------------------------
 // UPDATE
@@ -167,30 +177,58 @@ const moveSpeed = 1.0;
 
 app.on("update", (dt) => {
 
-    if (!leftController)
+    if (!leftController || !leftController.gamepad) {
+        // decay velocity to zero if no controller
+        velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
         return;
-
-    if (!leftController.gamepad)
-        return;
+    }
 
     const axes = leftController.gamepad.axes;
+    const buttons = leftController.gamepad.buttons;
 
-    if (!axes)
-        return;
+    let x = 0;
+    let y = 0;
 
-    // Left stick
-    const x = axes[0];
-    const y = axes[1];
+    if (axes) {
+        x = axes[0];
+        y = axes[1];
+        if (Math.abs(x) < 0.1) x = 0;
+        if (Math.abs(y) < 0.1) y = 0;
+    }
 
-    // Deadzone
-    if (Math.abs(x) < 0.1 && Math.abs(y) < 0.1)
-        return;
+    // Camera-relative directions, flattened to horizontal plane
+    forward.copy(camera.forward);
+    forward.y = 0;
+    forward.normalize();
 
-    // Move the entire room
-    splatRoot.translateLocal(
-        x * moveSpeed * dt,
-        0,
-        y * moveSpeed * dt
+    right.copy(camera.right);
+    right.y = 0;
+    right.normalize();
+
+    move.set(0, 0, 0);
+    move.add(right.clone().mulScalar(x));
+    move.add(forward.clone().mulScalar(-y)); // stick up (negative y) = forward
+
+    // Trigger = up, Grip = down (indices per xr-standard mapping)
+    const trigger = buttons && buttons[0] ? buttons[0].pressed : false;
+    const grip = buttons && buttons[1] ? buttons[1].pressed : false;
+
+    if (trigger) move.y += 1;
+    if (grip) move.y -= 1;
+
+    if (move.length() > 1.0) {
+        move.normalize();
+    }
+
+    target.copy(move).mulScalar(moveSpeed);
+    velocity.lerp(velocity, target, smoothing * dt);
+
+    // Move the WORLD opposite to simulated camera movement
+    const delta = velocity.clone().mulScalar(-dt);
+    splatRoot.setPosition(
+        splatRoot.getPosition().x + delta.x,
+        splatRoot.getPosition().y + delta.y,
+        splatRoot.getPosition().z + delta.z
     );
 
 });
