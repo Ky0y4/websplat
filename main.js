@@ -172,13 +172,36 @@ const move = new Vec3();
 const target = new Vec3();
 
 // ----------------------------------------------------
+// DEBUG OVERLAY
+// ----------------------------------------------------
+
+const debugDiv = document.createElement('div');
+debugDiv.style.cssText = `
+    position:fixed;
+    top:10px;
+    left:10px;
+    z-index:20;
+    color:white;
+    background:rgba(0,0,0,0.6);
+    padding:10px;
+    font-family:monospace;
+    font-size:14px;
+    white-space:pre;
+`;
+document.body.appendChild(debugDiv);
+
+// ----------------------------------------------------
 // UPDATE
 // ----------------------------------------------------
 
 app.on("update", (dt) => {
 
     if (leftController && leftController.gamepad) {
-    console.log('axes:', leftController.gamepad.axes);
+    debugDiv.textContent =
+        'axes: ' + JSON.stringify(leftController.gamepad.axes.map(a => a.toFixed(2))) + '\n' +
+        'buttons: ' + JSON.stringify(leftController.gamepad.buttons.map(b => b.pressed));
+    } else {
+        debugDiv.textContent = 'no left controller/gamepad';
     }
 
     if (!leftController || !leftController.gamepad) {
