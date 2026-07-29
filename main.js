@@ -80,22 +80,6 @@ splatRoot.setPosition(0, 0, 0);
 
 const splat = new Entity("Vr Lab");
 
-// Your current import offsets
-splat.setPosition(0, -0.7, 0);
-splat.setEulerAngles(0, 0, 180);
-
-splat.addComponent("gsplat", {
-    asset: assets[1]
-});
-
-splatRoot.addChild(splat);
-
-// ----------------------------------------------------
-// SPLAT
-// ----------------------------------------------------
-
-const splat = new Entity("Vr Lab");
-
 splat.setPosition(0, -0.7, 0);
 splat.setEulerAngles(0, 0, 180);
 
