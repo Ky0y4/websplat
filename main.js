@@ -88,6 +88,7 @@ splat.addComponent("gsplat", {
 });
 
 splatRoot.addChild(splat);
+window.splat = splat;
 
 // ---------- DEBUG ----------
 console.log("GSplat component:");
