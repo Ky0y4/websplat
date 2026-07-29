@@ -91,6 +91,37 @@ splat.addComponent("gsplat", {
 splatRoot.addChild(splat);
 
 // ----------------------------------------------------
+// SPLAT
+// ----------------------------------------------------
+
+const splat = new Entity("Vr Lab");
+
+splat.setPosition(0, -0.7, 0);
+splat.setEulerAngles(0, 0, 180);
+
+splat.addComponent("gsplat", {
+    asset: assets[1]
+});
+
+splatRoot.addChild(splat);
+
+// ---------- DEBUG ----------
+console.log("GSplat component:");
+console.log(splat.gsplat);
+
+console.dir(splat.gsplat);
+
+console.log("Keys:");
+console.log(Object.keys(splat.gsplat));
+
+console.log("meshInstance:");
+console.log(splat.gsplat.meshInstance);
+
+console.log("meshInstances:");
+console.log(splat.gsplat.meshInstances);
+// ---------------------------
+
+// ----------------------------------------------------
 // XR BUTTON
 // ----------------------------------------------------
 
