@@ -105,21 +105,20 @@ app.scene.gsplat.varyings.add([
 
 // --- Vertex chunk: compute each splat's distance from the camera ---
 const gsplatVS = `
-uniform vec3 uCameraPosition; // camera position, pre-converted to splat model space
+uniform vec3 uCameraPosition;
 
 void modifySplatCenter(inout vec3 center) {
     float d = length(center - uCameraPosition);
-    setVaryingCamDist(d);
+    setCamDist(d);
 }
 
 void modifySplatRotationScale(vec3 originalCenter, vec3 modifiedCenter, inout vec4 rotation, inout vec3 scale) {
-    // no changes needed
 }
 
 void modifySplatColor(vec3 center, inout vec4 color) {
-    // no changes needed — this is the per-splat VS hook, separate from your fragment PS hook
 }
 `;
+
 // --- Fragment chunk: compare against real-world depth, fade alpha ---
 const gsplatPS = `
 uniform mat4 matrix_depth_uv;
@@ -133,7 +132,7 @@ uniform float depth_raw_to_meters;
 #endif
 
 void modifySplatColor(vec2 gaussianUV, inout vec4 color) {
-    float splatDist = getVaryingCamDist();
+    float splatDist = getCamDist();
 
     vec2 uvScreen = gl_FragCoord.xy * uScreenSize.zw;
 
