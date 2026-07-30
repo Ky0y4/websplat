@@ -39,9 +39,7 @@ const assets = [
         url: 'https://cdn.jsdelivr.net/npm/playcanvas/scripts/esm/camera-controls.mjs'
     }),
 
-    new Asset('xr-controllers', 'script', {         
-        url: 'https://cdn.jsdelivr.net/npm/playcanvas/scripts/esm/xr-controllers.mjs'
-    }),
+
 
     new Asset('vrlab', 'gsplat', {
         url: './streamed/lod-meta.json'
