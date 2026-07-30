@@ -12,7 +12,8 @@ import {
     XRDEPTHSENSINGFORMAT_F32,
     XREYE_NONE,
     TYPE_FLOAT32,
-    PIXELFORMAT_R32F
+    PIXELFORMAT_R32F,
+    Mat4
 } from 'playcanvas';
 
 // ----------------------------------------------------
@@ -104,12 +105,21 @@ app.scene.gsplat.varyings.add([
 
 // --- Vertex chunk: compute each splat's distance from the camera ---
 const gsplatVS = `
+uniform vec3 uCameraPosition; // camera position, pre-converted to splat model space
+
 void modifySplatCenter(inout vec3 center) {
-    float d = length(center - matrix_viewInv[3].xyz);
+    float d = length(center - uCameraPosition);
     setVaryingCamDist(d);
 }
-`;
 
+void modifySplatRotationScale(vec3 originalCenter, vec3 modifiedCenter, inout vec4 rotation, inout vec3 scale) {
+    // no changes needed
+}
+
+void modifySplatColor(vec3 center, inout vec4 color) {
+    // no changes needed — this is the per-splat VS hook, separate from your fragment PS hook
+}
+`;
 // --- Fragment chunk: compare against real-world depth, fade alpha ---
 const gsplatPS = `
 uniform mat4 matrix_depth_uv;
@@ -238,6 +248,9 @@ const forward = new Vec3();
 const move = new Vec3();
 const target = new Vec3();
 
+const worldToModel = new Mat4();
+const camPosModel = new Vec3();
+const camPosArray = new Float32Array(3);
 
 // ----------------------------------------------------
 // UPDATE
@@ -258,6 +271,12 @@ app.on("update", (dt) => {
             sceneMat.setDefine('XRDEPTH_FLOAT', app.xr.views.depthPixelFormat === PIXELFORMAT_R32F);
         }
     }
+    worldToModel.copy(splat.getWorldTransform()).invert();
+    worldToModel.transformPoint(camera.getPosition(), camPosModel);
+    camPosArray[0] = camPosModel.x;
+    camPosArray[1] = camPosModel.y;
+    camPosArray[2] = camPosModel.z;
+    app.scene.gsplat.material.setParameter('uCameraPosition', camPosArray);
 
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
