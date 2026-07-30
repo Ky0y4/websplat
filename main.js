@@ -121,6 +121,7 @@ void modifySplatColor(vec3 center, inout vec4 color) {
 
 // --- Fragment chunk: compare against real-world depth, fade alpha ---
 const gsplatPS = `
+uniform vec4 uScreenSize;
 uniform mat4 matrix_depth_uv;
 uniform float depth_raw_to_meters;
 
