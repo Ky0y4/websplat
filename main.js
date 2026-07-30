@@ -39,6 +39,10 @@ const assets = [
         url: 'https://cdn.jsdelivr.net/npm/playcanvas/scripts/esm/camera-controls.mjs'
     }),
 
+    new Asset('xr-controllers', 'script', {         
+        url: 'https://cdn.jsdelivr.net/npm/playcanvas/scripts/esm/xr-controllers.mjs'
+    }),
+
     new Asset('vrlab', 'gsplat', {
         url: './streamed/lod-meta.json'
     })
@@ -61,6 +65,7 @@ camera.addComponent('camera', {
 
 camera.addComponent('script');
 camera.script.create('cameraControls');
+camera.script.create('xrControllers'); 
 
 app.root.addChild(camera);
 
