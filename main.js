@@ -7,7 +7,12 @@ import {
     RESOLUTION_AUTO,
     XRTYPE_AR,
     XRSPACE_LOCALFLOOR,
-    Vec3
+    Vec3,
+    XRDEPTHSENSINGUSAGE_GPU,
+    XRDEPTHSENSINGFORMAT_F32,
+    XREYE_NONE,
+    TYPE_FLOAT32,
+    PIXELFORMAT_R32F
 } from 'playcanvas';
 
 // ----------------------------------------------------
@@ -88,6 +93,75 @@ splat.addComponent("gsplat", {
 
 splatRoot.addChild(splat);
 
+
+// ----------------------------------------------------
+// GSPLAT DEPTH OCCLUSION SETUP 
+// ----------------------------------------------------
+// Give every splat a per-splat "distance from camera" value
+app.scene.gsplat.varyings.add([
+    { name: 'camDist', type: TYPE_FLOAT32, components: 1 }
+]);
+
+// --- Vertex chunk: compute each splat's distance from the camera ---
+const gsplatVS = `
+void modifySplatCenter(inout vec3 center) {
+    float d = length(center - matrix_viewInv[3].xyz);
+    setVaryingCamDist(d);
+}
+`;
+
+// --- Fragment chunk: compare against real-world depth, fade alpha ---
+const gsplatPS = `
+uniform mat4 matrix_depth_uv;
+uniform float depth_raw_to_meters;
+
+#ifdef XRDEPTH_ARRAY
+    uniform int view_index;
+    uniform highp sampler2DArray depthMap;
+#else
+    uniform sampler2D depthMap;
+#endif
+
+void modifySplatColor(vec2 gaussianUV, inout vec4 color) {
+    float splatDist = getVaryingCamDist();
+
+    vec2 uvScreen = gl_FragCoord.xy * uScreenSize.zw;
+
+    #ifdef XRDEPTH_ARRAY
+        // two eyes packed side by side in normalized screen space
+        uvScreen = uvScreen * vec2(2.0, 1.0) - vec2(float(view_index), 0.0);
+        vec2 uvNorm = (matrix_depth_uv * vec4(uvScreen, 0.0, 1.0)).xy;
+        vec3 uv = vec3(uvNorm, view_index);
+    #else
+        vec2 uv = (matrix_depth_uv * vec4(uvScreen.x, 1.0 - uvScreen.y, 0.0, 1.0)).xy;
+    #endif
+
+    #ifdef XRDEPTH_FLOAT
+        #ifdef XRDEPTH_ARRAY
+            float realDist = texture(depthMap, uv).r * depth_raw_to_meters;
+        #else
+            float realDist = texture2D(depthMap, uv).r * depth_raw_to_meters;
+        #endif
+    #else
+        #ifdef XRDEPTH_ARRAY
+            vec2 packed = texture(depthMap, uv).ra;
+        #else
+            vec2 packed = texture2D(depthMap, uv).ra;
+        #endif
+        float realDist = dot(packed, vec2(255.0, 256.0 * 255.0)) * depth_raw_to_meters;
+    #endif
+
+    float margin = 0.05;
+    float occlusion = clamp((splatDist - realDist) / margin, 0.0, 1.0);
+    color.a *= (1.0 - occlusion);
+}
+`;
+
+const sceneMat = app.scene.gsplat.material;
+sceneMat.getShaderChunks('glsl').set('gsplatModifyVS', gsplatVS);
+sceneMat.getShaderChunks('glsl').set('gsplatModifyPS', gsplatPS);
+sceneMat.update();
+
 // ----------------------------------------------------
 // XR BUTTON
 // ----------------------------------------------------
@@ -110,28 +184,27 @@ font-size:16px;
 document.body.appendChild(button);
 
 button.addEventListener('click', () => {
-
     if (app.xr.supported && app.xr.isAvailable(XRTYPE_AR)) {
-
         camera.script.enabled = false;
 
         camera.camera.startXr(
             XRTYPE_AR,
             XRSPACE_LOCALFLOOR,
             {
+                depthSensing: {
+                    usagePreference: XRDEPTHSENSINGUSAGE_GPU,
+                    dataFormatPreference: XRDEPTHSENSINGFORMAT_F32
+                },
                 callback: (err) => {
-                    if (err) {
-                        console.error(err);
-                    }
+                    if (err) console.error(err);
                 }
             }
         );
-
     } else {
         alert("AR not supported");
     }
-
 });
+
 // ----------------------------------------------------
 // CONTROLLERS
 // ----------------------------------------------------
@@ -171,6 +244,20 @@ const target = new Vec3();
 // ----------------------------------------------------
 
 app.on("update", (dt) => {
+
+    if (app.xr.active && app.xr.views.availableDepth) {
+        const view = app.xr.views.list[0];
+        if (view && view.textureDepth) {
+            const sceneMat = app.scene.gsplat.material;
+            const isStereo = view.eye !== XREYE_NONE;
+
+            sceneMat.setParameter('depthMap', view.textureDepth);
+            sceneMat.setParameter('matrix_depth_uv', view.depthUvMatrix.data);
+            sceneMat.setParameter('depth_raw_to_meters', view.depthValueToMeters ?? 1.0);
+            sceneMat.setDefine('XRDEPTH_ARRAY', isStereo);
+            sceneMat.setDefine('XRDEPTH_FLOAT', app.xr.views.depthPixelFormat === PIXELFORMAT_R32F);
+        }
+    }
 
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
