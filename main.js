@@ -7,9 +7,7 @@ import {
     RESOLUTION_AUTO,
     XRTYPE_AR,
     XRSPACE_LOCALFLOOR,
-    Vec3,
-    XRDEPTHSENSINGUSAGE_GPU,
-    XRDEPTHSENSINGFORMAT_F32
+    Vec3
 } from 'playcanvas';
 
 // ----------------------------------------------------
@@ -29,12 +27,6 @@ const app = new Application(canvas, {
 app.setCanvasFillMode(FILLMODE_FILL_WINDOW);
 app.setCanvasResolution(RESOLUTION_AUTO);
 app.start();
-
-console.log("Scene GSplat:");
-console.dir(app.scene.gsplat);
-
-console.log("Scene GSplat Material:");
-console.dir(app.scene.gsplat.material);
 
 window.addEventListener('resize', () => app.resizeCanvas());
 
@@ -61,7 +53,7 @@ await new Promise(resolve => loader.load(resolve));
 
 const camera = new Entity('Camera');
 
-camera.setPosition(0.5, 2, -0.5);
+camera.setPosition(0.5, 2, 0);
 
 camera.addComponent('camera', {
     clearColor: [0, 0, 0, 0]
@@ -86,6 +78,7 @@ splatRoot.setPosition(0, 0, 0);
 
 const splat = new Entity("Vr Lab");
 
+// Your current import offsets
 splat.setPosition(0, -0.7, 0);
 splat.setEulerAngles(0, 0, 180);
 
@@ -94,8 +87,6 @@ splat.addComponent("gsplat", {
 });
 
 splatRoot.addChild(splat);
-window.splat = splat;
-
 
 // ----------------------------------------------------
 // XR BUTTON
@@ -128,10 +119,6 @@ button.addEventListener('click', () => {
             XRTYPE_AR,
             XRSPACE_LOCALFLOOR,
             {
-                depthSensing: {
-                    usagePreference: XRDEPTHSENSINGUSAGE_GPU,
-                    dataFormatPreference: XRDEPTHSENSINGFORMAT_F32
-                },
                 callback: (err) => {
                     if (err) {
                         console.error(err);
@@ -145,7 +132,6 @@ button.addEventListener('click', () => {
     }
 
 });
-
 // ----------------------------------------------------
 // CONTROLLERS
 // ----------------------------------------------------
@@ -163,19 +149,6 @@ app.xr.input.on("add", (inputSource) => {
     if (inputSource.handedness === "right")
         rightController = inputSource;
 
-});
-
-// ----------------------------------------------------
-// DEPTH SENSING CHECK
-// ----------------------------------------------------
-
-console.log('Depth sensing supported:', app.xr.views.supportedDepth);
-
-app.xr.on('start', () => {
-    console.log('XR session started');
-    console.log('Depth available:', app.xr.views.availableDepth);
-    console.log('Depth GPU optimized:', app.xr.views.depthGpuOptimized);
-    console.log('Depth pixel format:', app.xr.views.depthPixelFormat);
 });
 
 // ----------------------------------------------------
@@ -254,28 +227,4 @@ app.xr.on("end", () => {
 
     camera.script.enabled = true;
 
-});
-
-let debugPrinted = false;
-
-app.on("update", () => {
-
-    if (debugPrinted)
-        return;
-
-    if (!splat.gsplat.instance)
-        return;
-
-    debugPrinted = true;
-
-    console.log("===== GSPLAT READY =====");
-
-    console.log("Instance:");
-    console.dir(splat.gsplat.instance);
-
-    console.log("Material:");
-    console.dir(splat.gsplat.material);
-
-    console.log("Resource:");
-    console.dir(splat.gsplat.resource);
 });
