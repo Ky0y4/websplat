@@ -13,7 +13,9 @@ import {
     XREYE_NONE,
     TYPE_FLOAT32,
     PIXELFORMAT_R32F,
-    Mat4
+    Mat4,
+    StandardMaterial,   
+    Color           
 } from 'playcanvas';
 
 // ----------------------------------------------------
@@ -262,7 +264,8 @@ let lastFloatFormat = null;
 let lastDepthAvailable = null;
 
 app.on("update", (dt) => {
-
+    debugMat.emissive.set(0, app.xr.views.availableDepth ? 1 : 0, app.xr.views.availableDepth ? 0 : 1);
+    debugMat.update();
     let depthAvailable = false;
 
     if (app.xr.active && app.xr.views.availableDepth) {
@@ -350,6 +353,30 @@ app.on("update", (dt) => {
 });
 
 // ----------------------------------------------------
+// DEBUG INDICATOR (temporary — attach to camera, shows depth status)
+// ----------------------------------------------------
+
+const debugIndicator = new Entity('DebugIndicator');
+debugIndicator.addComponent('render', { type: 'plane' });
+debugIndicator.setLocalPosition(0, 0, -1); // 1m in front of camera
+debugIndicator.setLocalScale(0.1, 0.1, 0.1);
+debugIndicator.setLocalEulerAngles(90, 0, 0); // face the camera
+camera.addChild(debugIndicator);
+
+const debugMat = new StandardMaterial();
+debugMat.emissive = new Color(1, 0, 0); // starts red
+debugMat.update();
+debugIndicator.render.meshInstances[0].material = debugMat;
+
+// ----------------------------------------------------
+app.xr.on('start', () => {
+    debugMat.emissive.set(
+        app.xr.views.supportedDepth ? 0 : 1,
+        app.xr.views.supportedDepth ? 1 : 0,
+        0
+    );
+    debugMat.update();
+});
 
 app.xr.on("end", () => {
 
