@@ -133,37 +133,38 @@ uniform float depth_raw_to_meters;
 #endif
 
 void modifySplatColor(vec2 gaussianUV, inout vec4 color) {
-    float splatDist = getCamDist();
+    #ifdef XR_DEPTH_AVAILABLE
+        float splatDist = getCamDist();
 
-    vec2 uvScreen = gl_FragCoord.xy * uScreenSize.zw;
+        vec2 uvScreen = gl_FragCoord.xy * uScreenSize.zw;
 
-    #ifdef XRDEPTH_ARRAY
-        // two eyes packed side by side in normalized screen space
-        uvScreen = uvScreen * vec2(2.0, 1.0) - vec2(float(view_index), 0.0);
-        vec2 uvNorm = (matrix_depth_uv * vec4(uvScreen, 0.0, 1.0)).xy;
-        vec3 uv = vec3(uvNorm, view_index);
-    #else
-        vec2 uv = (matrix_depth_uv * vec4(uvScreen.x, 1.0 - uvScreen.y, 0.0, 1.0)).xy;
-    #endif
-
-    #ifdef XRDEPTH_FLOAT
         #ifdef XRDEPTH_ARRAY
-            float realDist = texture(depthMap, uv).r * depth_raw_to_meters;
+            uvScreen = uvScreen * vec2(2.0, 1.0) - vec2(float(view_index), 0.0);
+            vec2 uvNorm = (matrix_depth_uv * vec4(uvScreen, 0.0, 1.0)).xy;
+            vec3 uv = vec3(uvNorm, view_index);
         #else
-            float realDist = texture2D(depthMap, uv).r * depth_raw_to_meters;
+            vec2 uv = (matrix_depth_uv * vec4(uvScreen.x, 1.0 - uvScreen.y, 0.0, 1.0)).xy;
         #endif
-    #else
-        #ifdef XRDEPTH_ARRAY
-            vec2 packed = texture(depthMap, uv).ra;
-        #else
-            vec2 packed = texture2D(depthMap, uv).ra;
-        #endif
-        float realDist = dot(packed, vec2(255.0, 256.0 * 255.0)) * depth_raw_to_meters;
-    #endif
 
-    float margin = 0.05;
-    float occlusion = clamp((splatDist - realDist) / margin, 0.0, 1.0);
-    color.a *= (1.0 - occlusion);
+        #ifdef XRDEPTH_FLOAT
+            #ifdef XRDEPTH_ARRAY
+                float realDist = texture(depthMap, uv).r * depth_raw_to_meters;
+            #else
+                float realDist = texture2D(depthMap, uv).r * depth_raw_to_meters;
+            #endif
+        #else
+            #ifdef XRDEPTH_ARRAY
+                vec2 packed = texture(depthMap, uv).ra;
+            #else
+                vec2 packed = texture2D(depthMap, uv).ra;
+            #endif
+            float realDist = dot(packed, vec2(255.0, 256.0 * 255.0)) * depth_raw_to_meters;
+        #endif
+
+        float margin = 0.05;
+        float occlusion = clamp((splatDist - realDist) / margin, 0.0, 1.0);
+        color.a *= (1.0 - occlusion);
+    #endif
 }
 `;
 
@@ -256,21 +257,42 @@ const camPosArray = new Float32Array(3);
 // UPDATE
 // ----------------------------------------------------
 
+let lastStereo = null;
+let lastFloatFormat = null;
+let lastDepthAvailable = null;
+
 app.on("update", (dt) => {
+
+    let depthAvailable = false;
 
     if (app.xr.active && app.xr.views.availableDepth) {
         const view = app.xr.views.list[0];
         if (view && view.textureDepth) {
             const sceneMat = app.scene.gsplat.material;
             const isStereo = view.eye !== XREYE_NONE;
+            const wantsFloat = app.xr.views.depthPixelFormat === PIXELFORMAT_R32F;
 
             sceneMat.setParameter('depthMap', view.textureDepth);
             sceneMat.setParameter('matrix_depth_uv', view.depthUvMatrix.data);
             sceneMat.setParameter('depth_raw_to_meters', view.depthValueToMeters ?? 1.0);
-            sceneMat.setDefine('XRDEPTH_ARRAY', isStereo);
-            sceneMat.setDefine('XRDEPTH_FLOAT', app.xr.views.depthPixelFormat === PIXELFORMAT_R32F);
+
+            if (isStereo !== lastStereo) {
+                sceneMat.setDefine('XRDEPTH_ARRAY', isStereo);
+                lastStereo = isStereo;
+            }
+            if (wantsFloat !== lastFloatFormat) {
+                sceneMat.setDefine('XRDEPTH_FLOAT', wantsFloat);
+                lastFloatFormat = wantsFloat;
+            }
+            depthAvailable = true;
         }
     }
+
+    if (depthAvailable !== lastDepthAvailable) {
+        app.scene.gsplat.material.setDefine('XR_DEPTH_AVAILABLE', depthAvailable);
+        lastDepthAvailable = depthAvailable;
+    }
+
     worldToModel.copy(splat.getWorldTransform()).invert();
     worldToModel.transformPoint(camera.getPosition(), camPosModel);
     camPosArray[0] = camPosModel.x;
