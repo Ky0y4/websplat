@@ -175,7 +175,7 @@ app.xr.input.on("add", (inputSource) => {
 
     const rayEntity = new Entity('Ray');
     rayEntity.addComponent('render', { type: 'cylinder' });
-    rayEntity.setLocalScale(0.005, 0.005, 5);
+    rayEntity.setLocalScale(0.005, 5, 0.005);
     const rayMat = new StandardMaterial();
     rayMat.emissive = new Color(1, 1, 1);
     rayMat.update();
