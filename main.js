@@ -51,6 +51,13 @@ const loader = new AssetListLoader(assets, app.assets);
 await new Promise(resolve => loader.load(resolve));
 
 // ----------------------------------------------------
+// PLAYER RIG
+// ----------------------------------------------------
+
+const playerRig = new Entity("PlayerRig");
+app.root.addChild(playerRig);
+
+// ----------------------------------------------------
 // Camera
 // ----------------------------------------------------
 
@@ -66,14 +73,16 @@ camera.addComponent('script');
 camera.script.create('cameraControls');
 
 
-app.root.addChild(camera);
+playerRig.addChild(camera);
+
+
 
 // ----------------------------------------------------
 // SPLAT ROOT
 // ----------------------------------------------------
 
 const worldRoot = new Entity("WorldRoot");
-app.root.addChild(worldRoot);
+playerRig.addChild(worldRoot);
 
 const splatRoot = new Entity("SplatRoot");
 worldRoot.addChild(splatRoot);
@@ -284,7 +293,7 @@ app.on("update", (dt) => {
 
         if (rx !== 0) {
 
-           worldRoot.rotateLocal(
+           playerRig.rotateLocal(
                 0,
                 rx * turnSpeed * dt,
                 0
@@ -332,15 +341,19 @@ app.on("update", (dt) => {
     velocity.lerp(velocity, target, smoothing * dt);
 
     const delta = velocity.clone().mulScalar(-dt);
-    worldRoot.setPosition(
-        worldRoot.getPosition().x + delta.x,
-        worldRoot.getPosition().y + delta.y,
-        worldRoot.getPosition().z + delta.z
+    playerRig.setPosition(
+        playerRig.getPosition().x + delta.x,
+        playerRig.getPosition().y + delta.y,
+        playerRig.getPosition().z + delta.z
     );
-
 });
 
 // ----------------------------------------------------
+app.xr.on("start", () => {
+    playerRig.setPosition(camera.getPosition());
+    camera.setLocalPosition(0, 0, 0);
+});
+
 
 app.xr.on("end", () => {
 
