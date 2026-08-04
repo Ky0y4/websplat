@@ -62,7 +62,7 @@ camera.addComponent('camera', {
 
 camera.addComponent('script');
 camera.script.create('cameraControls');
-camera.script.create('xrControllers'); 
+
 
 app.root.addChild(camera);
 
@@ -115,7 +115,7 @@ button.addEventListener('click', () => {
 
     if (app.xr.supported && app.xr.isAvailable(XRTYPE_AR)) {
 
-        camera.script.enabled = true;
+        camera.script.cameraControls.enabled = false;
 
         camera.camera.startXr(
             XRTYPE_AR,
@@ -227,7 +227,7 @@ app.on("update", (dt) => {
 
 app.xr.on("end", () => {
 
-    camera.script.enabled = true;
+    camera.script.cameraControls.enabled = true;  
 
 });
 
