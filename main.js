@@ -207,6 +207,10 @@ const forward = new Vec3();
 const move = new Vec3();
 const target = new Vec3();
 
+const rayOrigin = new Vec3();        
+const rayEnd = new Vec3();           
+const rayColorDefault = new Color(1, 1, 1);   
+const rayColorActive = new Color(0, 1, 0);    
 
 // ----------------------------------------------------
 // UPDATE
@@ -223,6 +227,15 @@ app.on("update", (dt) => {
         } else {
             entity.enabled = false;
         }
+
+        // --- ray ---
+        rayOrigin.copy(src.getOrigin());
+        rayEnd.copy(src.getDirection()).mulScalar(10).add(rayOrigin);
+
+        const isSelecting = src.selecting || (src.gamepad && src.gamepad.buttons[0] && src.gamepad.buttons[0].pressed);
+        const rayColor = isSelecting ? rayColorActive : rayColorDefault;
+
+        app.renderLine(rayOrigin, rayEnd, rayColor);
     }
 
     if (!leftController || !leftController.gamepad) {
