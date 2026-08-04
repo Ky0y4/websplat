@@ -224,6 +224,10 @@ const smoothing = 5.0; // higher = snappier, lower = floatier
 
 let velocity = new Vec3();
 
+let scaling = false;
+let startDistance = 0;
+const startScale = new Vec3();
+
 // scratch vectors (avoid allocating every frame)
 const forward = new Vec3();
 const move = new Vec3();
@@ -323,18 +327,44 @@ app.on("update", (dt) => {
         rightController.gamepad.buttons &&
         rightController.gamepad.buttons[4] &&
         rightController.gamepad.buttons[4].pressed;
-    if (xPressed && aPressed) {
-        for (const entity of activeControllers) {
-            entity._rayMat.emissive.set(0, 1, 0); // Green
-            entity._rayMat.update();
+    
+    if (
+        xPressed &&
+        aPressed &&
+        leftController &&
+        rightController
+    ) {
+
+        const leftPos = leftController.getPosition();
+        const rightPos = rightController.getPosition();
+
+        if (leftPos && rightPos) {
+
+            // First frame of scaling
+            if (!scaling) {
+                scaling = true;
+
+                startDistance = leftPos.distance(rightPos);
+
+                startScale.copy(
+                    splatRoot.getLocalScale()
+                );
+            }
+
+            const currentDistance = leftPos.distance(rightPos);
+
+            const factor = currentDistance / startDistance;
+
+            splatRoot.setLocalScale(
+                startScale.x * factor,
+                startScale.y * factor,
+                startScale.z * factor
+            );
         }
 
     } else {
 
-        for (const entity of activeControllers) {
-            entity._rayMat.emissive.set(1, 1, 1); // White
-            entity._rayMat.update();
-        }
+        scaling = false;
 
     }
 
