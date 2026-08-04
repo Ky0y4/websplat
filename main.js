@@ -310,6 +310,34 @@ app.on("update", (dt) => {
     const axes = leftController.gamepad.axes;
     const buttons = leftController.gamepad.buttons;
 
+    // X button (left controller)
+    const xPressed =
+        buttons &&
+        buttons[4] &&
+        buttons[4].pressed;
+
+    // A button (right controller)
+    const aPressed =
+        rightController &&
+        rightController.gamepad &&
+        rightController.gamepad.buttons &&
+        rightController.gamepad.buttons[4] &&
+        rightController.gamepad.buttons[4].pressed;
+    if (xPressed && aPressed) {
+        for (const entity of activeControllers) {
+            entity._rayMat.emissive.set(0, 1, 0); // Green
+            entity._rayMat.update();
+        }
+
+    } else {
+
+        for (const entity of activeControllers) {
+            entity._rayMat.emissive.set(1, 1, 1); // White
+            entity._rayMat.update();
+        }
+
+    }
+
     let y = 0; // vertical, from joystick
 
     if (axes && axes.length >= 2) {
