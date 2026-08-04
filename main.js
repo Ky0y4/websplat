@@ -286,7 +286,7 @@ app.on("update", (dt) => {
 
            worldRoot.rotateLocal(
                 0,
-                -rx * turnSpeed * dt,
+                rx * turnSpeed * dt,
                 0
             );
         }
