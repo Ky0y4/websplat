@@ -134,12 +134,14 @@ button.addEventListener('click', () => {
     }
 
 });
+
 // ----------------------------------------------------
 // CONTROLLERS
 // ----------------------------------------------------
 
 let leftController = null;
 let rightController = null;
+const activeControllers = [];
 
 app.xr.input.on("add", (inputSource) => {
 
@@ -150,6 +152,30 @@ app.xr.input.on("add", (inputSource) => {
 
     if (inputSource.handedness === "right")
         rightController = inputSource;
+
+    const entity = new Entity('Controller');
+    entity._inputSource = inputSource;
+    camera.addChild(entity);
+    activeControllers.push(entity);
+
+    const profileId = inputSource.profiles[0];
+    const handedness = inputSource.handedness;
+    const url = `https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/${profileId}/${handedness}.glb`;
+
+    app.assets.loadFromUrlAndFilename(url, 'controller.glb', 'container', (err, containerAsset) => {
+        if (err) {
+            console.error('Controller model load failed:', err);
+            return;
+        }
+        const modelRoot = containerAsset.resource.instantiateRenderEntity();
+        entity.addChild(modelRoot);
+    });
+
+    inputSource.once('remove', () => {
+        const idx = activeControllers.indexOf(entity);
+        if (idx !== -1) activeControllers.splice(idx, 1);
+        entity.destroy();
+    });
 
 });
 
@@ -173,6 +199,17 @@ const target = new Vec3();
 // ----------------------------------------------------
 
 app.on("update", (dt) => {
+
+    for (const entity of activeControllers) {
+        const src = entity._inputSource;
+        if (src.grip) {
+            entity.enabled = true;
+            entity.setPosition(src.getPosition());
+            entity.setRotation(src.getRotation());
+        } else {
+            entity.enabled = false;
+        }
+    }
 
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
@@ -231,12 +268,3 @@ app.xr.on("end", () => {
 
 });
 
-import('https://cdn.jsdelivr.net/npm/playcanvas@latest/scripts/esm/xr-controllers.mjs')
-    .then(() => {
-        camera.script.create('xrControllers');
-        console.log('xr-controllers loaded');
-    })
-    .catch((err) => {
-        console.warn('xr-controllers failed, falling back to box meshes:', err);
-        // fall back to your manual box-mesh code here
-});
