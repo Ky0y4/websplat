@@ -223,6 +223,10 @@ const forward = new Vec3();
 const move = new Vec3();
 const target = new Vec3();
 
+const turnSpeed = 90; // degrees per second at full stick deflection
+const camPos = new Vec3();
+const relPos = new Vec3();
+
 // ----------------------------------------------------
 // UPDATE
 // ----------------------------------------------------
@@ -265,6 +269,32 @@ app.on("update", (dt) => {
             entity._rayMat.update();
         }
     }
+
+    if (rightController && rightController.gamepad) {
+    const rAxes = rightController.gamepad.axes;
+    let rx = 0;
+
+    if (rAxes && rAxes.length >= 2) {
+        rx = rAxes[rAxes.length - 2]; // horizontal thumbstick axis
+        if (Math.abs(rx) < 0.1) rx = 0;
+    }
+
+    if (rx !== 0) {
+        const angleDeg = -rx * turnSpeed * dt; // flip sign here if turn direction feels reversed
+        const angleRad = angleDeg * Math.PI / 180;
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+
+        camPos.copy(camera.getPosition());
+        relPos.copy(splatRoot.getPosition()).sub(camPos);
+
+        const newX = relPos.x * cos - relPos.z * sin;
+        const newZ = relPos.x * sin + relPos.z * cos;
+
+        splatRoot.setPosition(camPos.x + newX, camPos.y + relPos.y, camPos.z + newZ);
+        splatRoot.rotateLocal(0, angleDeg, 0);
+    }
+}
 
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
