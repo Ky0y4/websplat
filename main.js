@@ -72,8 +72,12 @@ app.root.addChild(camera);
 // SPLAT ROOT
 // ----------------------------------------------------
 
+const worldRoot = new Entity("WorldRoot");
+app.root.addChild(worldRoot);
+
 const splatRoot = new Entity("SplatRoot");
-app.root.addChild(splatRoot);
+worldRoot.addChild(splatRoot);
+
 splatRoot.setPosition(0, 0, 0);
 
 // ----------------------------------------------------
@@ -224,8 +228,7 @@ const move = new Vec3();
 const target = new Vec3();
 
 const turnSpeed = 90; // degrees per second at full stick deflection
-const camPos = new Vec3();
-const relPos = new Vec3();
+
 
 // ----------------------------------------------------
 // UPDATE
@@ -271,31 +274,23 @@ app.on("update", (dt) => {
     }
 
     if (rightController && rightController.gamepad) {
-    const rAxes = rightController.gamepad.axes;
-    let rx = 0;
+        const rAxes = rightController.gamepad.axes;
+        let rx = 0;
 
-    if (rAxes && rAxes.length >= 2) {
-        rx = rAxes[rAxes.length - 2]; // horizontal thumbstick axis
-        if (Math.abs(rx) < 0.1) rx = 0;
+        if (rAxes && rAxes.length >= 2) {
+            rx = rAxes[rAxes.length - 2]; // horizontal thumbstick axis
+            if (Math.abs(rx) < 0.1) rx = 0;
+        }
+
+        if (rx !== 0) {
+
+           worldRoot.rotateLocal(
+                0,
+                -rx * turnSpeed * dt,
+                0
+            );
+        }
     }
-
-    if (rx !== 0) {
-        const angleDeg = -rx * turnSpeed * dt; // flip sign here if turn direction feels reversed
-        const angleRad = angleDeg * Math.PI / 180;
-        const cos = Math.cos(angleRad);
-        const sin = Math.sin(angleRad);
-
-        camPos.copy(camera.getPosition());
-        relPos.copy(splatRoot.getPosition()).sub(camPos);
-
-        const newX = relPos.x * cos - relPos.z * sin;
-        const newZ = relPos.x * sin + relPos.z * cos;
-
-        splatRoot.setPosition(camPos.x + newX, camPos.y + relPos.y, camPos.z + newZ);
-        splatRoot.rotateLocal(0, angleDeg, 0);
-    }
-}
-
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
         return;
@@ -337,10 +332,10 @@ app.on("update", (dt) => {
     velocity.lerp(velocity, target, smoothing * dt);
 
     const delta = velocity.clone().mulScalar(-dt);
-    splatRoot.setPosition(
-        splatRoot.getPosition().x + delta.x,
-        splatRoot.getPosition().y + delta.y,
-        splatRoot.getPosition().z + delta.z
+    worldRoot.setPosition(
+        worldRoot.getPosition().x + delta.x,
+        worldRoot.getPosition().y + delta.y,
+        worldRoot.getPosition().z + delta.z
     );
 
 });
