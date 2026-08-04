@@ -173,6 +173,17 @@ app.xr.input.on("add", (inputSource) => {
     camera.addChild(entity);
     activeControllers.push(entity);
 
+    const rayEntity = new Entity('Ray');
+    rayEntity.addComponent('render', { type: 'cylinder' });
+    rayEntity.setLocalScale(0.005, 0.005, 5);
+    const rayMat = new StandardMaterial();
+    rayMat.emissive = new Color(1, 1, 1);
+    rayMat.update();
+    rayEntity.render.meshInstances[0].material = rayMat;
+    entity.addChild(rayEntity);
+    entity._rayEntity = rayEntity;
+    entity._rayMat = rayMat;
+
     const profileId = inputSource.profiles[0];
     const handedness = inputSource.handedness;
     const url = `https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/${profileId}/${handedness}.glb`;
@@ -208,11 +219,6 @@ const forward = new Vec3();
 const move = new Vec3();
 const target = new Vec3();
 
-const rayOrigin = new Vec3();        
-const rayEnd = new Vec3();           
-const rayColorDefault = new Color(1, 1, 1);   
-const rayColorActive = new Color(0, 1, 0);    
-
 // ----------------------------------------------------
 // UPDATE
 // ----------------------------------------------------
@@ -233,17 +239,14 @@ app.on("update", (dt) => {
             entity.enabled = false;
         }
 
-        const origin = src.getOrigin();
-        const dir = src.getDirection();
-
-        if (origin && dir) {
-            rayOrigin.copy(origin);
-            rayEnd.copy(dir).mulScalar(10).add(rayOrigin);
+        const ray = entity._rayEntity;
+        if (ray) {
+            ray.setLocalEulerAngles(90, 0, 0);
+            ray.setLocalPosition(0, 0, -2.5);
 
             const isSelecting = src.selecting || (src.gamepad && src.gamepad.buttons[0] && src.gamepad.buttons[0].pressed);
-            const rayColor = isSelecting ? rayColorActive : rayColorDefault;
-
-            app.renderLine(rayOrigin, rayEnd, rayColor);
+            entity._rayMat.emissive.set(isSelecting ? 0 : 1, 1, isSelecting ? 0 : 1);
+            entity._rayMat.update();
         }
     }
 
