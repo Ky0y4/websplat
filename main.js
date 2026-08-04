@@ -183,7 +183,7 @@ app.xr.input.on("add", (inputSource) => {
     const rayMat = new StandardMaterial();
     rayMat.emissive = new Color(1, 1, 1);
     rayMat.update();
-    rayEntity.render.meshInstances[0].material = rayMat;
+    rayEntity.render.meshInstances.forEach(mi => mi.material = rayMat);   // ← changed from [0] to all instances
     entity.addChild(rayEntity);
     entity._rayEntity = rayEntity;
     entity._rayMat = rayMat;
