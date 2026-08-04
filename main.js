@@ -51,12 +51,17 @@ const loader = new AssetListLoader(assets, app.assets);
 await new Promise(resolve => loader.load(resolve));
 
 // ----------------------------------------------------
-// Camera
+// Camera Rig
 // ----------------------------------------------------
 
-const camera = new Entity('Camera');
+const rig = new Entity('Rig');
+app.root.addChild(rig);
 
-camera.setPosition(0.5, 2, 0);
+rig.setPosition(0.5, 2, 0);
+
+
+// Camera
+const camera = new Entity('Camera');
 
 camera.addComponent('camera', {
     clearColor: [0, 0, 0, 0]
@@ -66,7 +71,8 @@ camera.addComponent('script');
 camera.script.create('cameraControls');
 
 
-app.root.addChild(camera);
+// Camera becomes child of rig
+rig.addChild(camera); 
 
 // ----------------------------------------------------
 // SPLAT ROOT
@@ -266,6 +272,36 @@ app.on("update", (dt) => {
         }
     }
 
+    // ----------------------------------------------------
+    // TURNING
+    // ----------------------------------------------------
+
+    if (rightController && rightController.gamepad) {
+
+        const rAxes = rightController.gamepad.axes;
+
+        let rx = 0;
+
+        if (rAxes && rAxes.length >= 2) {
+
+            rx = rAxes[rAxes.length - 2];
+
+            if (Math.abs(rx) < 0.1)
+                rx = 0;
+        }
+
+
+        if (rx !== 0) {
+
+            rig.rotateLocal(
+                0,
+                -rx * 90 * dt,
+                0
+            );
+
+        }
+    }
+
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
         return;
@@ -282,13 +318,13 @@ app.on("update", (dt) => {
         if (Math.abs(y) < 0.1) y = 0;
     }
 
-    // Camera-relative forward, flattened to horizontal plane
-    forward.copy(camera.forward);
+
+    // Rig-relative forward
+    forward.copy(rig.forward);
     forward.y = 0;
     forward.normalize();
 
-    move.set(0, 0, 0);
-
+    move.set(0,0,0);
     // Trigger = forward, Grip = backward (per xr-standard: buttons[0]=trigger, buttons[1]=grip)
     const trigger = buttons && buttons[0] ? buttons[0].pressed : false;
     const grip = buttons && buttons[1] ? buttons[1].pressed : false;
@@ -304,13 +340,13 @@ app.on("update", (dt) => {
     }
 
     target.copy(move).mulScalar(moveSpeed);
+
     velocity.lerp(velocity, target, smoothing * dt);
 
-    const delta = velocity.clone().mulScalar(-dt);
-    splatRoot.setPosition(
-        splatRoot.getPosition().x + delta.x,
-        splatRoot.getPosition().y + delta.y,
-        splatRoot.getPosition().z + delta.z
+
+    // move player instead of moving world
+    rig.translate(
+        velocity.clone().mulScalar(dt)
     );
 
 });
