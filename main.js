@@ -115,7 +115,7 @@ button.addEventListener('click', () => {
 
     if (app.xr.supported && app.xr.isAvailable(XRTYPE_AR)) {
 
-        camera.script.enabled = false;
+        camera.script.enabled = true;
 
         camera.camera.startXr(
             XRTYPE_AR,
