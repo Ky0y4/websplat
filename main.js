@@ -39,14 +39,20 @@ const assets = [
         url: 'https://cdn.jsdelivr.net/npm/playcanvas/scripts/esm/camera-controls.mjs'
     }),
 
-    new Asset('xr-controllers', 'script', {
-    url: 'https://cdn.jsdelivr.net/npm/playcanvas@latest/scripts/esm/xr-controllers.mjs'
-    }),
-
     new Asset('vrlab', 'gsplat', {
         url: './streamed/lod-meta.json'
     })
 ];
+
+import('https://cdn.jsdelivr.net/npm/playcanvas@latest/scripts/esm/xr-controllers.mjs')
+    .then(() => {
+        camera.script.create('xrControllers');
+        console.log('xr-controllers loaded');
+    })
+    .catch((err) => {
+        console.warn('xr-controllers failed, falling back to box meshes:', err);
+        // fall back to your manual box-mesh code here
+    });
 
 const loader = new AssetListLoader(assets, app.assets);
 await new Promise(resolve => loader.load(resolve));
