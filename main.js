@@ -9,7 +9,7 @@ import {
     XRSPACE_LOCALFLOOR,
     Vec3,
     Color,
-    StandMaterial
+    StandardMaterial
 } from 'playcanvas';
 
 // ----------------------------------------------------
