@@ -51,13 +51,6 @@ const loader = new AssetListLoader(assets, app.assets);
 await new Promise(resolve => loader.load(resolve));
 
 // ----------------------------------------------------
-// PLAYER RIG
-// ----------------------------------------------------
-
-const playerRig = new Entity("PlayerRig");
-app.root.addChild(playerRig);
-
-// ----------------------------------------------------
 // Camera
 // ----------------------------------------------------
 
@@ -73,20 +66,14 @@ camera.addComponent('script');
 camera.script.create('cameraControls');
 
 
-playerRig.addChild(camera);
-
-
+app.root.addChild(camera);
 
 // ----------------------------------------------------
 // SPLAT ROOT
 // ----------------------------------------------------
 
-const worldRoot = new Entity("WorldRoot");
-playerRig.addChild(worldRoot);
-
 const splatRoot = new Entity("SplatRoot");
-worldRoot.addChild(splatRoot);
-
+app.root.addChild(splatRoot);
 splatRoot.setPosition(0, 0, 0);
 
 // ----------------------------------------------------
@@ -236,9 +223,6 @@ const forward = new Vec3();
 const move = new Vec3();
 const target = new Vec3();
 
-const turnSpeed = 90; // degrees per second at full stick deflection
-
-
 // ----------------------------------------------------
 // UPDATE
 // ----------------------------------------------------
@@ -282,24 +266,6 @@ app.on("update", (dt) => {
         }
     }
 
-    if (rightController && rightController.gamepad) {
-        const rAxes = rightController.gamepad.axes;
-        let rx = 0;
-
-        if (rAxes && rAxes.length >= 2) {
-            rx = rAxes[rAxes.length - 2]; // horizontal thumbstick axis
-            if (Math.abs(rx) < 0.1) rx = 0;
-        }
-
-        if (rx !== 0) {
-
-           playerRig.rotateLocal(
-                0,
-                rx * turnSpeed * dt,
-                0
-            );
-        }
-    }
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
         return;
@@ -341,19 +307,15 @@ app.on("update", (dt) => {
     velocity.lerp(velocity, target, smoothing * dt);
 
     const delta = velocity.clone().mulScalar(-dt);
-    playerRig.setPosition(
-        playerRig.getPosition().x + delta.x,
-        playerRig.getPosition().y + delta.y,
-        playerRig.getPosition().z + delta.z
+    splatRoot.setPosition(
+        splatRoot.getPosition().x + delta.x,
+        splatRoot.getPosition().y + delta.y,
+        splatRoot.getPosition().z + delta.z
     );
+
 });
 
 // ----------------------------------------------------
-app.xr.on("start", () => {
-    playerRig.setPosition(camera.getPosition());
-    camera.setLocalPosition(0, 0, 0);
-});
-
 
 app.xr.on("end", () => {
 
