@@ -7,7 +7,8 @@ import {
     RESOLUTION_AUTO,
     XRTYPE_AR,
     XRSPACE_LOCALFLOOR,
-    Vec3
+    Vec3,
+    Color
 } from 'playcanvas';
 
 // ----------------------------------------------------
@@ -134,6 +135,19 @@ button.addEventListener('click', () => {
     }
 
 });
+
+// ----------------------------------------------------
+// LIGHTING
+// ----------------------------------------------------
+
+const light = new Entity('Light');
+light.addComponent('light', {
+    type: 'directional',
+    color: new Color(1, 1, 1),
+    intensity: 1
+});
+light.setEulerAngles(45, 30, 0); // angle it so surfaces aren't flat-lit
+app.root.addChild(light);
 
 // ----------------------------------------------------
 // CONTROLLERS
