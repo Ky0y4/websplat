@@ -44,15 +44,6 @@ const assets = [
     })
 ];
 
-import('https://cdn.jsdelivr.net/npm/playcanvas@latest/scripts/esm/xr-controllers.mjs')
-    .then(() => {
-        camera.script.create('xrControllers');
-        console.log('xr-controllers loaded');
-    })
-    .catch((err) => {
-        console.warn('xr-controllers failed, falling back to box meshes:', err);
-        // fall back to your manual box-mesh code here
-    });
 
 const loader = new AssetListLoader(assets, app.assets);
 await new Promise(resolve => loader.load(resolve));
@@ -238,4 +229,14 @@ app.xr.on("end", () => {
 
     camera.script.enabled = true;
 
+});
+
+import('https://cdn.jsdelivr.net/npm/playcanvas@latest/scripts/esm/xr-controllers.mjs')
+    .then(() => {
+        camera.script.create('xrControllers');
+        console.log('xr-controllers loaded');
+    })
+    .catch((err) => {
+        console.warn('xr-controllers failed, falling back to box meshes:', err);
+        // fall back to your manual box-mesh code here
 });
