@@ -221,22 +221,30 @@ app.on("update", (dt) => {
 
     for (const entity of activeControllers) {
         const src = entity._inputSource;
-        if (src.grip) {
+
+        const pos = src.getPosition();
+        const rot = src.getRotation();
+
+        if (src.grip && pos && rot) {
             entity.enabled = true;
-            entity.setPosition(src.getPosition());
-            entity.setRotation(src.getRotation());
+            entity.setPosition(pos);
+            entity.setRotation(rot);
         } else {
             entity.enabled = false;
         }
 
-        // --- ray ---
-        rayOrigin.copy(src.getOrigin());
-        rayEnd.copy(src.getDirection()).mulScalar(10).add(rayOrigin);
+        const origin = src.getOrigin();
+        const dir = src.getDirection();
 
-        const isSelecting = src.selecting || (src.gamepad && src.gamepad.buttons[0] && src.gamepad.buttons[0].pressed);
-        const rayColor = isSelecting ? rayColorActive : rayColorDefault;
+        if (origin && dir) {
+            rayOrigin.copy(origin);
+            rayEnd.copy(dir).mulScalar(10).add(rayOrigin);
 
-        app.renderLine(rayOrigin, rayEnd, rayColor);
+            const isSelecting = src.selecting || (src.gamepad && src.gamepad.buttons[0] && src.gamepad.buttons[0].pressed);
+            const rayColor = isSelecting ? rayColorActive : rayColorDefault;
+
+            app.renderLine(rayOrigin, rayEnd, rayColor);
+        }
     }
 
     if (!leftController || !leftController.gamepad) {
