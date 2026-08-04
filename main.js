@@ -160,6 +160,10 @@ const activeControllers = [];
 
 app.xr.input.on("add", (inputSource) => {
 
+    if (activeControllers.some(e => e._inputSource === inputSource)) {
+        return;  
+    }
+
     console.log("Controller connected:", inputSource.handedness);
 
     if (inputSource.handedness === "left")
@@ -240,9 +244,21 @@ app.on("update", (dt) => {
         }
 
         const ray = entity._rayEntity;
-        if (ray) {
-            ray.setLocalEulerAngles(90, 0, 0);
-            ray.setLocalPosition(0, 0, -2.5);
+        const origin = src.getOrigin();
+        const dir = src.getDirection();
+
+        if (ray && origin && dir) {
+            ray.setPosition(
+                origin.x + dir.x * 2.5,
+                origin.y + dir.y * 2.5,
+                origin.z + dir.z * 2.5
+            );
+            ray.lookAt(
+                origin.x + dir.x,
+                origin.y + dir.y,
+                origin.z + dir.z
+            );
+            ray.rotateLocal(-90, 0, 0);
 
             const isSelecting = src.selecting || (src.gamepad && src.gamepad.buttons[0] && src.gamepad.buttons[0].pressed);
             entity._rayMat.emissive.set(isSelecting ? 0 : 1, 1, isSelecting ? 0 : 1);
