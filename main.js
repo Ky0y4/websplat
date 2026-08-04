@@ -8,7 +8,8 @@ import {
     XRTYPE_AR,
     XRSPACE_LOCALFLOOR,
     Vec3,
-    Color
+    Color,
+    StandMaterial
 } from 'playcanvas';
 
 // ----------------------------------------------------
