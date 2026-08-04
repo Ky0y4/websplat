@@ -144,7 +144,7 @@ const light = new Entity('Light');
 light.addComponent('light', {
     type: 'directional',
     color: new Color(1, 1, 1),
-    intensity: 1
+    intensity: 5
 });
 light.setEulerAngles(45, 30, 0); // angle it so surfaces aren't flat-lit
 app.root.addChild(light);
