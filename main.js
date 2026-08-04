@@ -8,8 +8,7 @@ import {
     XRTYPE_AR,
     XRSPACE_LOCALFLOOR,
     Vec3,
-    Color,
-    StandardMaterial
+    Color
 } from 'playcanvas';
 
 // ----------------------------------------------------
@@ -173,17 +172,6 @@ app.xr.input.on("add", (inputSource) => {
     camera.addChild(entity);
     activeControllers.push(entity);
 
-    const rayEntity = new Entity('Ray');
-    rayEntity.addComponent('render', { type: 'cylinder' });
-    rayEntity.setLocalScale(0.005, 0.005, 5);
-    const rayMat = new StandardMaterial();
-    rayMat.emissive = new Color(1, 1, 1);
-    rayMat.update();
-    rayEntity.render.meshInstances[0].material = rayMat;
-    entity.addChild(rayEntity);
-    entity._rayEntity = rayEntity;
-    entity._rayMat = rayMat;
-
     const profileId = inputSource.profiles[0];
     const handedness = inputSource.handedness;
     const url = `https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/${profileId}/${handedness}.glb`;
@@ -219,6 +207,7 @@ const forward = new Vec3();
 const move = new Vec3();
 const target = new Vec3();
 
+
 // ----------------------------------------------------
 // UPDATE
 // ----------------------------------------------------
@@ -227,26 +216,12 @@ app.on("update", (dt) => {
 
     for (const entity of activeControllers) {
         const src = entity._inputSource;
-
-        const pos = src.getPosition();
-        const rot = src.getRotation();
-
-        if (src.grip && pos && rot) {
+        if (src.grip) {
             entity.enabled = true;
-            entity.setPosition(pos);
-            entity.setRotation(rot);
+            entity.setPosition(src.getPosition());
+            entity.setRotation(src.getRotation());
         } else {
             entity.enabled = false;
-        }
-
-        const ray = entity._rayEntity;
-        if (ray) {
-            ray.setLocalEulerAngles(90, 0, 0);
-            ray.setLocalPosition(0, 0, -2.5);
-
-            const isSelecting = src.selecting || (src.gamepad && src.gamepad.buttons[0] && src.gamepad.buttons[0].pressed);
-            entity._rayMat.emissive.set(isSelecting ? 0 : 1, 1, isSelecting ? 0 : 1);
-            entity._rayMat.update();
         }
     }
 
