@@ -42,7 +42,7 @@ const assets = [
     }),
 
     new Asset('vrlab', 'gsplat', {
-        url: './streamed/lod-meta.json'
+        url: './wallsl/lod-meta.json'
     })
 ];
 
