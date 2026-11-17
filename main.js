@@ -6,6 +6,7 @@ import {
     FILLMODE_FILL_WINDOW,
     RESOLUTION_AUTO,
     XRTYPE_AR,
+    XRTYPE_VR,
     XRSPACE_LOCALFLOOR,
     Vec3,
     Quat,
@@ -127,57 +128,66 @@ splatRoot.addChild(splat);
 // XR BUTTON
 // ----------------------------------------------------
 
-const button = document.createElement('button');
+// AR = passthrough: you see the real room behind the splat (and through any
+//      thin / hollow spots in it).
+// VR = no passthrough: the background is a solid colour, so holes in the
+//      splat don't show reality.
 
-button.textContent = 'Enter AR';
+const VR_BACKGROUND = new Color(0.1, 0.1, 0.12);   // background colour in VR mode
+const AR_BACKGROUND = new Color(0, 0, 0, 0);        // transparent = passthrough
 
-button.style.cssText =
-`
-position:fixed;
-bottom:20px;
-left:50%;
-transform:translateX(-50%);
-z-index:10;
-padding:12px 24px;
-font-size:16px;
+const xrButtons = document.createElement('div');
+xrButtons.style.cssText = `
+position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+z-index:10; display:flex; gap:12px;
 `;
+document.body.appendChild(xrButtons);
 
-document.body.appendChild(button);
+function makeXrButton(label, type) {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText = 'padding:12px 24px;font-size:16px;';
+    btn.addEventListener('click', () => startXrSession(type));
+    xrButtons.appendChild(btn);
+}
 
-button.addEventListener('click', () => {
+makeXrButton('Enter AR', XRTYPE_AR);
+makeXrButton('Enter VR', XRTYPE_VR);
 
-    if (app.xr.supported && app.xr.isAvailable(XRTYPE_AR)) {
-
-        camera.script.cameraControls.enabled = false;
-
-        camera.camera.startXr(
-            XRTYPE_AR,
-            XRSPACE_LOCALFLOOR,
-            {
-                framebufferScaleFactor: XR_RESOLUTION_SCALE,
-                callback: (err) => {
-                    if (err) {
-                        console.error(err);
-                    }
-                }
-            }
-        );
-
-    } else {
-        alert("AR not supported");
+function startXrSession(type) {
+    if (!app.xr.supported || !app.xr.isAvailable(type)) {
+        alert(`${type === XRTYPE_AR ? 'AR' : 'VR'} not supported on this device`);
+        return;
     }
 
-});
+    camera.camera.clearColor = type === XRTYPE_AR ? AR_BACKGROUND : VR_BACKGROUND;
+    camera.script.cameraControls.enabled = false;
+
+    camera.camera.startXr(type, XRSPACE_LOCALFLOOR, {
+        framebufferScaleFactor: XR_RESOLUTION_SCALE,
+        callback: (err) => {
+            if (err) {
+                console.error(err);
+                camera.camera.clearColor = AR_BACKGROUND;
+                camera.script.cameraControls.enabled = true;
+            }
+        }
+    });
+}
 
 // ----------------------------------------------------
 // LIGHTING
 // ----------------------------------------------------
 
+// Ambient fills in faces turned away from the sun (otherwise they're black),
+// and a moderate sun intensity stops lit faces clipping to yellow/white.
+app.scene.ambientLight = new Color(0.45, 0.45, 0.45);
+
 const light = new Entity('Light');
 light.addComponent('light', {
     type: 'directional',
     color: new Color(1, 1, 1),
-    intensity: 5
+    intensity: 1.2
 });
 light.setEulerAngles(45, 30, 0); // angle it so surfaces aren't flat-lit
 app.root.addChild(light);
@@ -504,6 +514,9 @@ function refreshMeshList() {
 // Simple test box: 1 m wide, 0.5 m tall, 0.5 m deep
 const boxMat = new StandardMaterial();
 boxMat.diffuse = new Color(1, 0.55, 0.1);
+boxMat.useMetalness = true;
+boxMat.metalness = 0;
+boxMat.gloss = 0.2;      // matte, so highlights don't wash the colour out
 boxMat.update();
 
 function addBox() {
@@ -854,6 +867,8 @@ app.xr.on("start", () => {
 });
 
 app.xr.on("end", () => {
+
+    camera.camera.clearColor = AR_BACKGROUND;
 
     camera.script.cameraControls.enabled = true;  
 
