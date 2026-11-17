@@ -36,6 +36,23 @@ app.start();
 window.addEventListener('resize', () => app.resizeCanvas());
 
 // ----------------------------------------------------
+// SPLAT BUDGET
+// ----------------------------------------------------
+// Max splats drawn at once across the scene. The engine picks LOD levels
+// per area to stay under this. Lower = smoother on headset, less detail.
+
+const SPLAT_BUDGET_DESKTOP = 1500000;
+const SPLAT_BUDGET_XR = 600000;
+
+function setSplatBudget(budget) {
+    if (app.scene.gsplat && 'splatBudget' in app.scene.gsplat) {
+        app.scene.gsplat.splatBudget = budget;
+    }
+}
+
+setSplatBudget(SPLAT_BUDGET_DESKTOP);
+
+// ----------------------------------------------------
 // Load assets
 // ----------------------------------------------------
 
@@ -794,9 +811,17 @@ app.on("update", (dt) => {
 
 // ----------------------------------------------------
 
+app.xr.on("start", () => {
+
+    setSplatBudget(SPLAT_BUDGET_XR);
+
+});
+
 app.xr.on("end", () => {
 
     camera.script.cameraControls.enabled = true;  
+
+    setSplatBudget(SPLAT_BUDGET_DESKTOP);
 
 });
 
