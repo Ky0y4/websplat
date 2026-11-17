@@ -9,6 +9,8 @@ import {
     XRSPACE_LOCALFLOOR,
     Vec3,
     Quat,
+    Ray,
+    BoundingBox,
     Color,
     StandardMaterial
 } from 'playcanvas';
@@ -350,6 +352,274 @@ function updateSplatManipulation() {
 }
 
 // ----------------------------------------------------
+// MESHES
+// ----------------------------------------------------
+// Load .glb files from your device (button or drag & drop).
+// Meshes are children of splatRoot so they stay put relative to the splat
+// when you grab / scale it, but they're always kept at real-world size
+// (1 unit = 1 metre), so scale the splat to real size first.
+//
+// In VR:
+//   Point right laser at a mesh -> laser turns cyan
+//   Right trigger (hold)        -> drag the mesh along the laser
+//     + right stick left/right  -> rotate the mesh
+//     + right stick up/down     -> push away / pull closer
+//   B (right controller)        -> bring the last-added mesh in front of you
+
+const meshes = [];   // { entity, name, asset }
+
+const meshGrab = {
+    entry: null,
+    distance: 0,
+    offset: new Vec3(),     // mesh position - hit point, at grab start
+    startRot: new Quat(),
+    yaw: 0                  // extra rotation from the stick while held
+};
+
+const MESH_ROTATE_SPEED = 90;   // degrees / second
+const MESH_PUSH_SPEED = 1.5;    // metres / second
+const MESH_MIN_DISTANCE = 0.2;
+
+const ray = new Ray();
+const meshBox = new BoundingBox();
+const hitPoint = new Vec3();
+const meshTmp = new Vec3();
+const meshTmpQuat = new Quat();
+let prevBPressed = false;
+
+// ---------- UI ----------
+
+const panel = document.createElement('div');
+panel.style.cssText = `
+position:fixed; top:12px; left:12px; z-index:10;
+background:rgba(20,20,20,0.75); color:#fff; padding:10px 12px;
+border-radius:8px; font:14px sans-serif; max-width:260px;
+`;
+panel.innerHTML = `
+<button id="addMeshBtn" style="padding:8px 12px;font-size:14px;">Add mesh (.glb)</button>
+<input id="meshFileInput" type="file" accept=".glb" multiple style="display:none">
+<div style="margin-top:6px;opacity:0.7;font-size:12px;">or drag .glb files onto the page</div>
+<ul id="meshList" style="list-style:none;padding:0;margin:8px 0 0;"></ul>
+`;
+document.body.appendChild(panel);
+
+const fileInput = panel.querySelector('#meshFileInput');
+const meshListEl = panel.querySelector('#meshList');
+
+panel.querySelector('#addMeshBtn').addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', () => {
+    for (const file of fileInput.files) addMeshFromFile(file);
+    fileInput.value = '';   // allow picking the same file again
+});
+
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    for (const file of e.dataTransfer.files) {
+        if (file.name.toLowerCase().endsWith('.glb')) addMeshFromFile(file);
+    }
+});
+
+function refreshMeshList() {
+    meshListEl.innerHTML = '';
+    for (const entry of meshes) {
+        const li = document.createElement('li');
+        li.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:4px;';
+
+        const label = document.createElement('span');
+        label.textContent = entry.name;
+        label.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+
+        const bring = document.createElement('button');
+        bring.textContent = 'Bring here';
+        bring.title = 'Move in front of the camera';
+        bring.addEventListener('click', () => placeInFront(entry.entity));
+
+        const remove = document.createElement('button');
+        remove.textContent = '✕';
+        remove.title = 'Remove';
+        remove.addEventListener('click', () => removeMesh(entry));
+
+        li.append(label, bring, remove);
+        meshListEl.appendChild(li);
+    }
+}
+
+// ---------- load / place / remove ----------
+
+function addMeshFromFile(file) {
+    const url = URL.createObjectURL(file);
+
+    app.assets.loadFromUrlAndFilename(url, file.name, 'container', (err, asset) => {
+        URL.revokeObjectURL(url);
+
+        if (err) {
+            console.error('Mesh load failed:', err);
+            alert(`Couldn't load ${file.name}: ${err}`);
+            return;
+        }
+
+        const holder = new Entity(`Mesh: ${file.name}`);
+        holder.addChild(asset.resource.instantiateRenderEntity());
+        splatRoot.addChild(holder);
+
+        keepRealWorldSize(holder);
+        placeInFront(holder);
+
+        meshes.push({ entity: holder, name: file.name, asset });
+        refreshMeshList();
+    });
+}
+
+function removeMesh(entry) {
+    const idx = meshes.indexOf(entry);
+    if (idx !== -1) meshes.splice(idx, 1);
+    if (meshGrab.entry === entry) meshGrab.entry = null;
+    entry.entity.destroy();
+    app.assets.remove(entry.asset);
+    entry.asset.unload();
+    refreshMeshList();
+}
+
+// 1.5 m in front of the camera, facing the same way (yaw only)
+function placeInFront(entity) {
+    meshTmp.copy(camera.forward);
+    meshTmp.y = 0;
+    if (meshTmp.lengthSq() < 1e-4) meshTmp.set(0, 0, -1);
+    meshTmp.normalize().mulScalar(1.5).add(camera.getPosition());
+    entity.setPosition(meshTmp);
+
+    const yaw = getYaw(camera.getRotation()) ?? 0;
+    meshTmpQuat.setFromEulerAngles(0, yaw, 0);
+    entity.setRotation(meshTmpQuat);
+}
+
+// Cancel out splatRoot's scale so meshes stay 1:1 with the real world
+function keepRealWorldSize(entity) {
+    const s = splatRoot.getLocalScale().x || 1;
+    entity.setLocalScale(1 / s, 1 / s, 1 / s);
+}
+
+// ---------- ray picking ----------
+
+// Returns { entry, distance } for the closest mesh hit by the ray, or null
+function raycastMeshes(origin, dir) {
+    ray.set(origin, dir);
+
+    let best = null;
+    let bestDist = Infinity;
+
+    for (const entry of meshes) {
+        let first = true;
+        for (const render of entry.entity.findComponents('render')) {
+            for (const mi of render.meshInstances) {
+                if (first) { meshBox.copy(mi.aabb); first = false; }
+                else meshBox.add(mi.aabb);
+            }
+        }
+        if (first) continue;
+
+        if (meshBox.intersectsRay(ray, hitPoint)) {
+            const d = hitPoint.distance(origin);
+            if (d < bestDist) {
+                bestDist = d;
+                best = entry;
+            }
+        }
+    }
+
+    return best ? { entry: best, distance: bestDist } : null;
+}
+
+function getControllerEntity(src) {
+    return activeControllers.find(e => e._inputSource === src);
+}
+
+// ---------- per-frame ----------
+
+function updateMeshes(dt) {
+
+    for (const entry of meshes) keepRealWorldSize(entry.entity);
+
+    const src = rightController;
+    const origin = src && src.getOrigin();
+    const dir = src && src.getDirection();
+
+    // B button: bring last-added mesh in front of you (on press, not hold)
+    const bPressed = isPressed(src, 5);
+    if (bPressed && !prevBPressed && meshes.length) {
+        placeInFront(meshes[meshes.length - 1].entity);
+        pulse(src, 0.3, 30);
+    }
+    prevBPressed = bPressed;
+
+    if (!origin || !dir) {
+        meshGrab.entry = null;
+        return;
+    }
+
+    const triggerHeld = isPressed(src, 0);
+
+    // ---- not dragging: hover / start drag ----
+    if (!meshGrab.entry) {
+        const hit = raycastMeshes(origin, dir);
+
+        const ctrl = getControllerEntity(src);
+        if (hit && ctrl && ctrl._rayMat) {
+            ctrl._rayMat.emissive.set(0, 1, 1);   // cyan = pointing at a mesh
+            ctrl._rayMat.update();
+        }
+
+        if (hit && triggerHeld) {
+            meshGrab.entry = hit.entry;
+            meshGrab.distance = hit.distance;
+            meshTmp.copy(dir).mulScalar(hit.distance).add(origin);
+            meshGrab.offset.copy(hit.entry.entity.getPosition()).sub(meshTmp);
+            meshGrab.startRot.copy(hit.entry.entity.getRotation());
+            meshGrab.yaw = 0;
+            pulse(src);
+        }
+        return;
+    }
+
+    // ---- dragging ----
+    if (!triggerHeld) {
+        meshGrab.entry = null;
+        return;
+    }
+
+    // right stick: X = rotate, Y = push / pull
+    const axes = src.gamepad && src.gamepad.axes;
+    if (axes && axes.length >= 2) {
+        let sx = axes[axes.length - 2];
+        let sy = axes[axes.length - 1];
+        if (Math.abs(sx) < 0.1) sx = 0;
+        if (Math.abs(sy) < 0.1) sy = 0;
+
+        meshGrab.yaw -= sx * MESH_ROTATE_SPEED * dt;
+        meshGrab.distance = Math.max(
+            MESH_MIN_DISTANCE,
+            meshGrab.distance - sy * MESH_PUSH_SPEED * dt   // stick up (negative) = push away
+        );
+    }
+
+    const entity = meshGrab.entry.entity;
+
+    meshTmp.copy(dir).mulScalar(meshGrab.distance).add(origin).add(meshGrab.offset);
+    entity.setPosition(meshTmp);
+
+    meshTmpQuat.setFromEulerAngles(0, meshGrab.yaw, 0).mul(meshGrab.startRot);
+    entity.setRotation(meshTmpQuat);
+
+    const ctrl = getControllerEntity(src);
+    if (ctrl && ctrl._rayMat) {
+        ctrl._rayMat.emissive.set(0, 1, 0);   // green = dragging
+        ctrl._rayMat.update();
+    }
+}
+
+// ----------------------------------------------------
 // UPDATE
 // ----------------------------------------------------
 
@@ -411,7 +681,8 @@ app.on("update", (dt) => {
         }
 
 
-        if (rx !== 0) {
+        // While dragging a mesh, the right stick rotates / pushes the mesh instead
+        if (rx !== 0 && !meshGrab.entry) {
 
             rig.rotateLocal(
                 0,
@@ -427,6 +698,12 @@ app.on("update", (dt) => {
     // ----------------------------------------------------
 
     updateSplatManipulation();
+
+    // ----------------------------------------------------
+    // MESHES
+    // ----------------------------------------------------
+
+    updateMeshes(dt);
 
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
