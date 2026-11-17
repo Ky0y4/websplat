@@ -8,6 +8,7 @@ import {
     XRTYPE_AR,
     XRSPACE_LOCALFLOOR,
     Vec3,
+    Quat,
     Color,
     StandardMaterial
 } from 'playcanvas';
@@ -224,14 +225,129 @@ const smoothing = 5.0; // higher = snappier, lower = floatier
 
 let velocity = new Vec3();
 
-let scaling = false;
-let startDistance = 0;
-const startScale = new Vec3();
-
 // scratch vectors (avoid allocating every frame)
 const forward = new Vec3();
 const move = new Vec3();
 const target = new Vec3();
+
+// ----------------------------------------------------
+// SPLAT MANIPULATION
+// ----------------------------------------------------
+// Right grip (hold): grab the splat and move / turn it with your hand.
+//                    Rotation is yaw-only so the splat always stays upright.
+// X + A (hold):      scale the splat around the midpoint between your hands.
+//                    Moving both hands while scaling also drags the splat.
+
+const RAD_TO_DEG = 180 / Math.PI;
+
+const grabState = {
+    active: false,
+    startYaw: 0,
+    startOffset: new Vec3(),   // splat position - hand position, at grab start
+    startRot: new Quat()       // splat rotation at grab start
+};
+
+const scaleState = {
+    active: false,
+    startDistance: 0,
+    startScale: 1,
+    startOffset: new Vec3()    // splat position - hands midpoint, at scale start
+};
+
+// scratch
+const tmpDir = new Vec3();
+const tmpVec = new Vec3();
+const tmpMid = new Vec3();
+const tmpQuat = new Quat();
+const tmpQuat2 = new Quat();
+const FORWARD = new Vec3(0, 0, -1);
+
+function isPressed(src, index) {
+    return !!(src && src.gamepad && src.gamepad.buttons &&
+        src.gamepad.buttons[index] && src.gamepad.buttons[index].pressed);
+}
+
+function pulse(src, intensity = 0.5, ms = 40) {
+    const actuator = src && src.gamepad && src.gamepad.hapticActuators && src.gamepad.hapticActuators[0];
+    if (actuator && actuator.pulse) actuator.pulse(intensity, ms);
+}
+
+// Heading of a rotation around the world up axis, in degrees.
+// Returns null when pointing almost straight up/down (heading is undefined).
+function getYaw(rot) {
+    rot.transformVector(FORWARD, tmpDir);
+    if (tmpDir.x * tmpDir.x + tmpDir.z * tmpDir.z < 1e-4) return null;
+    return Math.atan2(-tmpDir.x, -tmpDir.z) * RAD_TO_DEG;
+}
+
+function updateSplatManipulation() {
+
+    const leftPos = leftController && leftController.getPosition();
+    const rightPos = rightController && rightController.getPosition();
+    const rightRot = rightController && rightController.getRotation();
+
+    // ---------- SCALE (X + A) — takes priority over grab ----------
+    const wantScale = isPressed(leftController, 4) && isPressed(rightController, 4) && leftPos && rightPos;
+
+    if (wantScale) {
+        grabState.active = false;
+
+        tmpMid.copy(leftPos).add(rightPos).mulScalar(0.5);
+        const distance = leftPos.distance(rightPos);
+
+        if (!scaleState.active) {
+            if (distance < 1e-3) return;
+            scaleState.active = true;
+            scaleState.startDistance = distance;
+            scaleState.startScale = splatRoot.getLocalScale().x;
+            scaleState.startOffset.copy(splatRoot.getPosition()).sub(tmpMid);
+            pulse(leftController);
+            pulse(rightController);
+        }
+
+        const factor = distance / scaleState.startDistance;
+        const s = scaleState.startScale * factor;
+        splatRoot.setLocalScale(s, s, s);
+
+        // Keep the point between your hands fixed on the splat
+        tmpVec.copy(scaleState.startOffset).mulScalar(factor).add(tmpMid);
+        splatRoot.setPosition(tmpVec);
+        return;
+    }
+    scaleState.active = false;
+
+    // ---------- GRAB (right grip) ----------
+    const wantGrab = isPressed(rightController, 1) && rightPos && rightRot;
+
+    if (!wantGrab) {
+        grabState.active = false;
+        return;
+    }
+
+    const yaw = getYaw(rightRot);
+
+    // (Re)anchor on grab start, or once a valid heading appears if the
+    // controller was pointing straight up/down when the grab began.
+    if (!grabState.active || (grabState.startYaw === null && yaw !== null)) {
+        if (!grabState.active) pulse(rightController);
+        grabState.active = true;
+        grabState.startYaw = yaw;
+        grabState.startOffset.copy(splatRoot.getPosition()).sub(rightPos);
+        grabState.startRot.copy(splatRoot.getRotation());
+    }
+
+    const deltaYaw = (yaw === null || grabState.startYaw === null) ? 0 : yaw - grabState.startYaw;
+    tmpQuat.setFromEulerAngles(0, deltaYaw, 0);
+
+    // position = hand + (rotated start offset)
+    tmpQuat.transformVector(grabState.startOffset, tmpVec);
+    tmpVec.add(rightPos);
+    splatRoot.setPosition(tmpVec);
+
+    // rotation = yawDelta * startRotation
+    tmpQuat2.mul2(tmpQuat, grabState.startRot);
+    splatRoot.setRotation(tmpQuat2);
+}
 
 // ----------------------------------------------------
 // UPDATE
@@ -306,6 +422,12 @@ app.on("update", (dt) => {
         }
     }
 
+    // ----------------------------------------------------
+    // GRAB / SCALE SPLAT
+    // ----------------------------------------------------
+
+    updateSplatManipulation();
+
     if (!leftController || !leftController.gamepad) {
         velocity.lerp(velocity, Vec3.ZERO, smoothing * dt);
         return;
@@ -314,59 +436,6 @@ app.on("update", (dt) => {
     const axes = leftController.gamepad.axes;
     const buttons = leftController.gamepad.buttons;
 
-    // X button (left controller)
-    const xPressed =
-        buttons &&
-        buttons[4] &&
-        buttons[4].pressed;
-
-    // A button (right controller)
-    const aPressed =
-        rightController &&
-        rightController.gamepad &&
-        rightController.gamepad.buttons &&
-        rightController.gamepad.buttons[4] &&
-        rightController.gamepad.buttons[4].pressed;
-    
-    if (
-        xPressed &&
-        aPressed &&
-        leftController &&
-        rightController
-    ) {
-
-        const leftPos = leftController.getPosition();
-        const rightPos = rightController.getPosition();
-
-        if (leftPos && rightPos) {
-
-            // First frame of scaling
-            if (!scaling) {
-                scaling = true;
-
-                startDistance = leftPos.distance(rightPos);
-
-                startScale.copy(
-                    splatRoot.getLocalScale()
-                );
-            }
-
-            const currentDistance = leftPos.distance(rightPos);
-
-            const factor = currentDistance / startDistance;
-
-            splatRoot.setLocalScale(
-                startScale.x * factor,
-                startScale.y * factor,
-                startScale.z * factor
-            );
-        }
-
-    } else {
-
-        scaling = false;
-
-    }
 
     let y = 0; // vertical, from joystick
 
