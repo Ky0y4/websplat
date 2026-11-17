@@ -44,6 +44,11 @@ window.addEventListener('resize', () => app.resizeCanvas());
 const SPLAT_BUDGET_DESKTOP = 1500000;
 const SPLAT_BUDGET_XR = 600000;
 
+// Headset render resolution (1.0 = native). Splats are limited by how many
+// pixels they cover, so this is the biggest lever when you're inside a
+// large splat. Try 0.7 if it still lags, 0.9 if it looks too soft.
+const XR_RESOLUTION_SCALE = 0.8;
+
 function setSplatBudget(budget) {
     if (app.scene.gsplat && 'splatBudget' in app.scene.gsplat) {
         app.scene.gsplat.splatBudget = budget;
@@ -149,6 +154,7 @@ button.addEventListener('click', () => {
             XRTYPE_AR,
             XRSPACE_LOCALFLOOR,
             {
+                framebufferScaleFactor: XR_RESOLUTION_SCALE,
                 callback: (err) => {
                     if (err) {
                         console.error(err);
@@ -252,16 +258,21 @@ const target = new Vec3();
 // ----------------------------------------------------
 // SPLAT MANIPULATION
 // ----------------------------------------------------
-// Right grip (hold): grab the splat and move / turn it with your hand.
-//                    Rotation is yaw-only so the splat always stays upright.
+// Right grip (hold): grab the splat and move it with your hand.
+//                    + right stick left/right: rotate (stays upright)
+//                    + right stick up/down: push away / pull closer
 // X + A (hold):      scale the splat around the midpoint between your hands.
 //                    Moving both hands while scaling also drags the splat.
 
 const RAD_TO_DEG = 180 / Math.PI;
 
+const SPLAT_ROTATE_SPEED = 45;  // degrees / second (right stick while gripping)
+const SPLAT_PUSH_SPEED = 2.0;   // metres / second (right stick while gripping)
+
 const grabState = {
     active: false,
-    startYaw: 0,
+    yaw: 0,                    // rotation added with the stick during this grab
+    push: new Vec3(),          // movement added with the stick during this grab
     startOffset: new Vec3(),   // splat position - hand position, at grab start
     startRot: new Quat()       // splat rotation at grab start
 };
@@ -299,7 +310,7 @@ function getYaw(rot) {
     return Math.atan2(-tmpDir.x, -tmpDir.z) * RAD_TO_DEG;
 }
 
-function updateSplatManipulation() {
+function updateSplatManipulation(dt) {
 
     const leftPos = leftController && leftController.getPosition();
     const rightPos = rightController && rightController.getPosition();
@@ -336,6 +347,10 @@ function updateSplatManipulation() {
     scaleState.active = false;
 
     // ---------- GRAB (right grip) ----------
+    // Hand movement moves the splat 1:1 (position only, no wrist twist, so a big
+    // splat doesn't swing wildly). While gripping, the right stick:
+    //   left/right -> rotate the splat around your hand
+    //   up/down    -> push the splat away / pull it closer (for big moves)
     const wantGrab = isPressed(rightController, 1) && rightPos && rightRot;
 
     if (!wantGrab) {
@@ -343,27 +358,43 @@ function updateSplatManipulation() {
         return;
     }
 
-    const yaw = getYaw(rightRot);
-
-    // (Re)anchor on grab start, or once a valid heading appears if the
-    // controller was pointing straight up/down when the grab began.
-    if (!grabState.active || (grabState.startYaw === null && yaw !== null)) {
-        if (!grabState.active) pulse(rightController);
+    if (!grabState.active) {
         grabState.active = true;
-        grabState.startYaw = yaw;
+        grabState.yaw = 0;
+        grabState.push.set(0, 0, 0);
         grabState.startOffset.copy(splatRoot.getPosition()).sub(rightPos);
         grabState.startRot.copy(splatRoot.getRotation());
+        pulse(rightController);
     }
 
-    const deltaYaw = (yaw === null || grabState.startYaw === null) ? 0 : yaw - grabState.startYaw;
-    tmpQuat.setFromEulerAngles(0, deltaYaw, 0);
+    const axes = rightController.gamepad && rightController.gamepad.axes;
+    if (axes && axes.length >= 2) {
+        let sx = axes[axes.length - 2];
+        let sy = axes[axes.length - 1];
+        if (Math.abs(sx) < 0.15) sx = 0;
+        if (Math.abs(sy) < 0.15) sy = 0;
 
-    // position = hand + (rotated start offset)
+        grabState.yaw -= sx * SPLAT_ROTATE_SPEED * dt;
+
+        if (sy !== 0) {
+            // horizontal direction the controller points
+            rightRot.transformVector(FORWARD, tmpDir);
+            tmpDir.y = 0;
+            if (tmpDir.lengthSq() > 1e-4) {
+                tmpDir.normalize().mulScalar(-sy * SPLAT_PUSH_SPEED * dt); // stick up = away
+                grabState.push.add(tmpDir);
+            }
+        }
+    }
+
+    tmpQuat.setFromEulerAngles(0, grabState.yaw, 0);
+
+    // position = hand + (rotated start offset) + push
     tmpQuat.transformVector(grabState.startOffset, tmpVec);
-    tmpVec.add(rightPos);
+    tmpVec.add(rightPos).add(grabState.push);
     splatRoot.setPosition(tmpVec);
 
-    // rotation = yawDelta * startRotation
+    // rotation = stickYaw * startRotation
     tmpQuat2.mul2(tmpQuat, grabState.startRot);
     splatRoot.setRotation(tmpQuat2);
 }
@@ -736,7 +767,7 @@ app.on("update", (dt) => {
 
 
         // While dragging a mesh, the right stick rotates / pushes the mesh instead
-        if (rx !== 0 && !meshGrab.entry) {
+        if (rx !== 0 && !meshGrab.entry && !grabState.active) {
 
             rig.rotateLocal(
                 0,
@@ -751,7 +782,7 @@ app.on("update", (dt) => {
     // GRAB / SCALE SPLAT
     // ----------------------------------------------------
 
-    updateSplatManipulation();
+    updateSplatManipulation(dt);
 
     // ----------------------------------------------------
     // MESHES
@@ -814,6 +845,11 @@ app.on("update", (dt) => {
 app.xr.on("start", () => {
 
     setSplatBudget(SPLAT_BUDGET_XR);
+
+    // Lower resolution at the edges of the view (Quest supports this)
+    if ('fixedFoveation' in app.xr) {
+        try { app.xr.fixedFoveation = 1; } catch (e) { /* not supported */ }
+    }
 
 });
 
