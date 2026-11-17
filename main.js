@@ -365,6 +365,7 @@ function updateSplatManipulation() {
 //     + right stick left/right  -> rotate the mesh
 //     + right stick up/down     -> push away / pull closer
 //   B (right controller)        -> bring the last-added mesh in front of you
+//   Y (left controller)         -> spawn a test box in front of you
 
 const meshes = [];   // { entity, name, asset }
 
@@ -386,6 +387,8 @@ const hitPoint = new Vec3();
 const meshTmp = new Vec3();
 const meshTmpQuat = new Quat();
 let prevBPressed = false;
+let prevYPressed = false;
+let boxCount = 0;
 
 // ---------- UI ----------
 
@@ -397,6 +400,7 @@ border-radius:8px; font:14px sans-serif; max-width:260px;
 `;
 panel.innerHTML = `
 <button id="addMeshBtn" style="padding:8px 12px;font-size:14px;">Add mesh (.glb)</button>
+<button id="addBoxBtn" style="padding:8px 12px;font-size:14px;">Add box</button>
 <input id="meshFileInput" type="file" accept=".glb" multiple style="display:none">
 <div style="margin-top:6px;opacity:0.7;font-size:12px;">or drag .glb files onto the page</div>
 <ul id="meshList" style="list-style:none;padding:0;margin:8px 0 0;"></ul>
@@ -407,6 +411,7 @@ const fileInput = panel.querySelector('#meshFileInput');
 const meshListEl = panel.querySelector('#meshList');
 
 panel.querySelector('#addMeshBtn').addEventListener('click', () => fileInput.click());
+panel.querySelector('#addBoxBtn').addEventListener('click', () => addBox());
 
 fileInput.addEventListener('change', () => {
     for (const file of fileInput.files) addMeshFromFile(file);
@@ -448,6 +453,28 @@ function refreshMeshList() {
 
 // ---------- load / place / remove ----------
 
+// Simple test box: 1 m wide, 0.5 m tall, 0.5 m deep
+const boxMat = new StandardMaterial();
+boxMat.diffuse = new Color(1, 0.55, 0.1);
+boxMat.update();
+
+function addBox() {
+    boxCount++;
+    const holder = new Entity(`Box ${boxCount}`);
+
+    const box = new Entity('BoxShape');
+    box.addComponent('render', { type: 'box', material: boxMat });
+    box.setLocalScale(1, 0.5, 0.5);
+    holder.addChild(box);
+
+    splatRoot.addChild(holder);
+    keepRealWorldSize(holder);
+    placeInFront(holder);
+
+    meshes.push({ entity: holder, name: `Box ${boxCount}`, asset: null });
+    refreshMeshList();
+}
+
 function addMeshFromFile(file) {
     const url = URL.createObjectURL(file);
 
@@ -477,8 +504,10 @@ function removeMesh(entry) {
     if (idx !== -1) meshes.splice(idx, 1);
     if (meshGrab.entry === entry) meshGrab.entry = null;
     entry.entity.destroy();
-    app.assets.remove(entry.asset);
-    entry.asset.unload();
+    if (entry.asset) {
+        app.assets.remove(entry.asset);
+        entry.asset.unload();
+    }
     refreshMeshList();
 }
 
@@ -545,6 +574,14 @@ function updateMeshes(dt) {
     const src = rightController;
     const origin = src && src.getOrigin();
     const dir = src && src.getDirection();
+
+    // Y button (left): spawn a test box (on press, not hold)
+    const yPressed = isPressed(leftController, 5);
+    if (yPressed && !prevYPressed) {
+        addBox();
+        pulse(leftController, 0.3, 30);
+    }
+    prevYPressed = yPressed;
 
     // B button: bring last-added mesh in front of you (on press, not hold)
     const bPressed = isPressed(src, 5);
