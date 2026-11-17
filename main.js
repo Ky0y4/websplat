@@ -44,8 +44,8 @@ const assets = [
         url: 'https://cdn.jsdelivr.net/npm/playcanvas/scripts/esm/camera-controls.mjs'
     }),
 
-    new Asset('wall', 'gsplat', {
-        url: './wallsl/lod-meta.json'
+    new Asset('sci_east', 'gsplat', {
+        url: './scieast/lod-meta.json'
     })
 ];
 
